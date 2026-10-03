@@ -10,7 +10,7 @@ if (defined('CHIM_GORE_VERSION')) {
     return;
 }
 
-define('CHIM_GORE_VERSION', '0.2.0');
+define('CHIM_GORE_VERSION', '0.2.1');
 define('CHIM_GORE_TABLE', 'plugins.chim_gore_settings');
 define('CHIM_GORE_LOG_TABLE', 'plugins.chim_gore_log');
 define('CHIM_GORE_LOG_KEEP', 2000);
