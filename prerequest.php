@@ -2,16 +2,13 @@
 /**
  * CHIM Gore - HerikaServer hook (loaded from main.php before dispatch, after the NPC profile).
  *
- * - Remembers when CHIM itself comments on a finished fight (combatend), so CHIM Gore does not
- *   talk over it.
- * - CHIMGore.dll asks one follower to react after combat with an "instruction" request that
- *   carries a [chim_gore ...] marker. Here we apply the chance/cooldown/score policy from the
- *   plugin page and rewrite the request into the configured instruction.
- * Everything else is left untouched.
+ * CHIMGore.dll asks one follower to react after combat with an "instruction" request that carries
+ * a [chim_gore ...] marker. The decision (chance/cooldown/score) is normally made earlier through
+ * api/decide.php; here the request is rewritten into the configured instruction. Everything else is
+ * left untouched.
  */
 
-$chimGoreType = $gameRequest[0] ?? '';
-if ($chimGoreType !== 'instruction' && $chimGoreType !== 'combatend' && $chimGoreType !== 'combatendmighty') {
+if (($gameRequest[0] ?? '') !== 'instruction') {
     return;
 }
 

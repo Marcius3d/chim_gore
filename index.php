@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'clear_log') {
         chimGoreLogClear() ? $message = 'Diagnostics log cleared.' : $error = 'Could not clear the log.';
     } else {
-        $bools = ['enabled', 'debug', 'use_ngd', 'use_df', 'log_each_event', 'reflect_after_combat', 'include_player_kills'];
+        $bools = ['enabled', 'debug', 'use_ngd', 'use_df', 'log_each_event', 'reflect_after_combat', 'include_player_kills', 'enrich_chim_combat'];
         $values = [];
         foreach ($bools as $key) {
             $values[$key] = isset($_POST[$key]) ? '1' : '0';
@@ -164,6 +164,7 @@ function cgModRow(string $label, bool $known, bool $loaded, string $version, str
       <tr><td>Dismembering Framework</td><td><?= cgModRow('DF', $statusTs > 0, !empty($status['df_loaded']), (string)($status['df_version'] ?? ''), !empty($status['df_loaded']) ? ' <span class="muted">(' . (int)($status['df_nodes'] ?? 0) . ' limb nodes)</span>' : '') ?></td></tr>
       <tr><td>This session: kills checked / gory / saved to CHIM memory</td><td><?= (int)($status['kills_seen'] ?? 0) ?> / <?= (int)($status['gore_events'] ?? 0) ?> / <?= (int)($status['logged_to_chim'] ?? 0) ?></td></tr>
       <tr><td>Reaction requests: from game / allowed by server</td><td><?= cgH($settings['stat_requests']) ?> / <?= cgH($settings['stat_spoken']) ?></td></tr>
+      <tr><td>CHIM's own combat comments enriched with gore</td><td><?= cgH($settings['stat_enriched']) ?></td></tr>
       <tr><td>Last reaction / cooldown left</td><td><?= $lastTs > 0 ? cgH(date('Y-m-d H:i:s', $lastTs)) : 'never' ?> / <?= $cooldownLeft > 0 ? cgH(ceil($cooldownLeft / 60) . ' min') : 'none' ?></td></tr>
       <?php if (!empty($status['last_error'])): ?><tr><td>Last error in game</td><td class="bad"><?= cgH($status['last_error']) ?></td></tr><?php endif; ?>
     </table>
@@ -199,6 +200,8 @@ function cgModRow(string $label, bool $known, bool $loaded, string $version, str
 
     <section>
       <h2>After-combat reaction</h2>
+      <label class="check"><input type="checkbox" name="enrich_chim_combat" value="1" <?= cgChecked($settings, 'enrich_chim_combat') ?>> Add the fight's gore to CHIM's own combat-end comment</label>
+      <p class="hint">CHIM often comments on a finished fight by itself. With this on, that comment also gets the decapitations and severed limbs of the fight, so the follower can talk about them even when CHIM Gore's own reaction is skipped.</p>
       <div class="row">
         <div><label>Chance (%)</label><input type="number" name="chance" min="0" max="100" value="<?= cgH($settings['chance']) ?>"><p class="hint">Of qualifying fights, how many get a comment.</p></div>
         <div><label>Cooldown (real minutes)</label><input type="number" name="cooldown_minutes" min="0" max="1440" value="<?= cgH($settings['cooldown_minutes']) ?>"><p class="hint">Minimum time between two comments.</p></div>

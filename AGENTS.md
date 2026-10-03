@@ -20,9 +20,13 @@ This repository is the source of a CHIM add-on. It has two parts.
 - **Game ↔ server HTTP.** The DLL resolves the server like CHIM does (`CHIMGore.ini [Server]` → `AIAgent.ini` → `127.0.0.1:7135/discover` → `127.0.0.1:8081`).
   - `GET ext/chim_gore/api/config.php` returns plain `key=value` lines. Keys are listed in `chimGoreGameKeys()`. Unknown keys must be ignored.
   - `POST api/status.php` takes flat JSON plus `log_lines` (up to 300).
+  - `GET api/decide.php?score=&npc=` returns `allow` or `skip:<reason>|<text>`. An allow leaves a 120 s token that `prerequest.php` consumes, so the decision is not rolled twice.
   - Keep both sides in sync when adding a setting.
 - **Marker.** The reaction text starts with `[chim_gore score=N heads=N limbs=N events=N]`. `lib/chim_gore.php` parses it. Keep both sides in sync.
-- **Server hook.** Only `prerequest.php` is used, for `instruction` and `combatend` requests. It runs after the NPC profile is loaded, so `$GLOBALS['HERIKA_NAME']` is the follower. Never give files in `lib/` or `api/` a hook name (HerikaServer loads hook names recursively); `scripts/build_packages.py` enforces this.
+- **Server hooks.**
+  - `prerequest.php`: `instruction` requests with the marker.
+  - `prompts.php`: adds recent `info_gore` events to CHIM's `combatend` cue.
+  - `postrequest.php`: records that CHIM finished its own combat comment. It runs after the NPC profile is loaded, so `$GLOBALS['HERIKA_NAME']` is the follower. Never give files in `lib/` or `api/` a hook name (HerikaServer loads hook names recursively); `scripts/build_packages.py` enforces this.
 - **Database.** Two tables:
   - `plugins.chim_gore_settings`: key/value.
   - `plugins.chim_gore_log`: diagnostics, trimmed to 2000 rows.

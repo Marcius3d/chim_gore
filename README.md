@@ -8,7 +8,7 @@ Without it, CHIM only records *"Serana killed Bandit"*. With it, CHIM learns *"S
 
 > "Did you see that? His head went halfway across the room. I may have overdone it."
 
-> **Status: 0.2.0, beta.** The packages build in CI and the server side is tested against PostgreSQL. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
+> **Status: 0.2.2, beta.** The packages build in CI and the server side is tested against PostgreSQL. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
 
 
 ## ⬇ Download
@@ -26,6 +26,7 @@ This link always points to the newest release. Older versions are on the [Releas
 | During a fight | Each decapitation or severed limb caused by the player or a follower is written to CHIM's memory as a short event. Nobody speaks, so combat chatter is not flooded. Nearby NPCs see these events in their context. |
 | After the fight | When combat has been over for a random 8–20 s, **one** follower may react to the most gruesome moment. The follower who did the cutting goes first, otherwise the nearest follower. If combat restarts in the meantime, the timer resets. |
 | Not every fight | The server decides whether to react using a chance (default 35 %), a cooldown (default 10 real minutes) and a minimum "gore score". You can change all three in the CHIM web UI. |
+| CHIM's own comment | When CHIM itself comments on the finished fight, the fight's decapitations and severed limbs are added to that comment, and CHIM Gore's separate reaction is skipped so nobody talks twice. |
 
 Gore score: severed head = 6 (+1 for every 2 m the head flew, up to +5), each limb = 2, finishing move = +1. Only the best moment of a fight counts.
 
@@ -110,7 +111,7 @@ Everything is configured on the CHIM web page: **Server Plugins** → *CHIM Gore
 ```
 
 - **`CHIMGore.dll`** is an SKSE plugin built with CommonLibSSE-NG. It talks to the gore mods only through their public Papyrus functions and to CHIM only through `AIAgentFunctions`, the same API CHIM's own scripts use. Every 30 s it also fetches its settings from `ext/chim_gore/api/config.php` and posts its status and new log lines to `api/status.php`. If the server is unreachable it falls back to the INI.
-- **`ext/chim_gore/`** is a HerikaServer plugin with one hook (`prerequest.php`), a settings page, two small API endpoints and two tables, `plugins.chim_gore_settings` and `plugins.chim_gore_log`. It changes only requests that carry the `[chim_gore …]` marker. It also notes CHIM's own `combatend` comments, so it does not talk over them. Every other request passes through untouched.
+- **`ext/chim_gore/`** is a HerikaServer plugin with three hooks (`prerequest.php`, `prompts.php`, `postrequest.php`), a settings page, three small API endpoints (`config`, `status`, `decide`) and two tables, `plugins.chim_gore_settings` and `plugins.chim_gore_log`. It rewrites only requests that carry the `[chim_gore …]` marker. It also adds the fight's gore to CHIM's own `combatend` comment and remembers when CHIM made that comment, so CHIM Gore does not talk over it. Every other request passes through untouched.
 - If the server part is missing, the follower still reacts, but without the chance/cooldown policy.
 - CHIM's own on/off switch is respected: when CHIM interaction is off, no reaction is generated.
 

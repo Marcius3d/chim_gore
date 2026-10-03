@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.2
+
+- Fix: the follower reaction was almost always skipped as "CHIM already commented on this fight". The CHIM combat comment is now recorded only when CHIM really finishes it (`postrequest.php`), not when the request arrives.
+- Fix: the killer's name was empty for some NPCs ("cut off the bandit's head"). Names now fall back to the reference name and the base NPC name.
+- New: when CHIM itself comments on a finished fight, the fight's decapitations and severed limbs are added to that comment, so followers talk about them even when CHIM Gore's own reaction is skipped. Option on the plugin page; on by default.
+- New: the game asks the server (`api/decide.php`) before requesting a reaction. Debug mode now shows the real outcome: `reaction skipped (cooldown / chance roll / not gory enough / CHIM already commented on this fight)` or `reaction request successful (name)`.
+
 ## 0.2.1
 
 - Fix: Next-Gen Decapitations and Dismembering Framework were reported as "not installed" when their plugins are ESL-flagged (light), as in Nolvus. Light plugins are now checked too, and a loaded SKSE DLL of either mod also counts as installed.
