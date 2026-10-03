@@ -1,0 +1,7 @@
+dist/
+SkyrimPlugin/build/
+SkyrimPlugin/vcpkg_installed/
+*.log
+*.key
+.env
+tokens/

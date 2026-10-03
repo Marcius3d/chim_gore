@@ -1,0 +1,22 @@
+{
+  "name": "chim_gore",
+  "display_name": "CHIM Gore",
+  "description": "Followers notice and remember decapitations and dismemberments (Next-Gen Decapitations, Dismembering Framework) and one of them reacts after the fight.",
+  "version": "0.1.0",
+  "schema_version": 2,
+  "config_url": "/HerikaServer/ext/chim_gore/index.php",
+  "config_url_target": "_blank",
+  "git_repo": "Marcius3d/chim_gore",
+  "mod_download_url": "https://github.com/Marcius3d/chim_gore/releases/download/v<version>/CHIM-Gore-<version>.zip",
+  "default_channel": "main",
+  "channels": {
+    "main": {
+      "label": "Live",
+      "branch": "main",
+      "package_source": "release",
+      "package_urls": [
+        "https://github.com/Marcius3d/chim_gore/releases/latest/download/chim_gore.tar.gz"
+      ]
+    }
+  }
+}
