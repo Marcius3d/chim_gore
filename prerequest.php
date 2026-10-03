@@ -2,17 +2,26 @@
 /**
  * CHIM Gore - HerikaServer hook (loaded from main.php before dispatch, after the NPC profile).
  *
- * CHIMGore.dll asks one follower to react after combat with an "instruction" request that carries
- * a [chim_gore ...] marker. The decision (chance/cooldown/score) is normally made earlier through
- * api/decide.php; here the request is rewritten into the configured instruction. Everything else is
- * left untouched.
+ * - "info_gore" events from CHIMGore.dll: appended to CHIM's own death line for that victim
+ *   (or stored so that everyone nearby sees them).
+ * - "instruction" requests with a [chim_gore ...] marker: rewritten into the configured
+ *   follower reaction (the decision was made earlier through api/decide.php).
+ * Everything else is left untouched.
  */
 
-if (($gameRequest[0] ?? '') !== 'instruction') {
+$chimGoreType = $gameRequest[0] ?? '';
+if ($chimGoreType !== 'instruction' && $chimGoreType !== 'info_gore') {
     return;
 }
 
 require_once __DIR__ . DIRECTORY_SEPARATOR . 'lib' . DIRECTORY_SEPARATOR . 'chim_gore.php';
+
+if ($chimGoreType === 'info_gore') {
+    if (chimGoreHandleGoreEvent($gameRequest)) {
+        terminate();
+    }
+    return;
+}
 
 $chimGoreResult = chimGoreHandleRequest($gameRequest);
 if ($chimGoreResult === null) {

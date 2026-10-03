@@ -8,7 +8,7 @@ Without it, CHIM only records *"Serana killed Bandit"*. With it, CHIM learns *"S
 
 > "Did you see that? His head went halfway across the room. I may have overdone it."
 
-> **Status: 0.2.2, beta.** The packages build in CI and the server side is tested against PostgreSQL. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
+> **Status: 0.3.0, beta.** The packages build in CI and the server side is tested against PostgreSQL. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
 
 
 ## ⬇ Download
@@ -23,7 +23,7 @@ This link always points to the newest release. Older versions are on the [Releas
 
 | When | What happens |
 |---|---|
-| During a fight | Each decapitation or severed limb caused by the player or a follower is written to CHIM's memory as a short event. Nobody speaks, so combat chatter is not flooded. Nearby NPCs see these events in their context. |
+| During a fight | Each decapitation or severed limb caused by the player or a follower is appended to CHIM's own death line for that victim (also visible in Prisma) and so becomes part of CHIM's memory. The killer is taken from the last weapon hit, so followers get the credit for their own blows. Nobody speaks, so combat chatter is not flooded. Nearby NPCs see these events in their context. |
 | After the fight | When combat has been over for a random 8–20 s, **one** follower may react to the most gruesome moment. The follower who did the cutting goes first, otherwise the nearest follower. If combat restarts in the meantime, the timer resets. |
 | Not every fight | The server decides whether to react using a chance (default 35 %), a cooldown (default 10 real minutes) and a minimum "gore score". You can change all three in the CHIM web UI. |
 | CHIM's own comment | When CHIM itself comments on the finished fight, the fight's decapitations and severed limbs are added to that comment, and CHIM Gore's separate reaction is skipped so nobody talks twice. |

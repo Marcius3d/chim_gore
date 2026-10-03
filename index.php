@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'clear_log') {
         chimGoreLogClear() ? $message = 'Diagnostics log cleared.' : $error = 'Could not clear the log.';
     } else {
-        $bools = ['enabled', 'debug', 'use_ngd', 'use_df', 'log_each_event', 'reflect_after_combat', 'include_player_kills', 'enrich_chim_combat'];
+        $bools = ['enabled', 'debug', 'use_ngd', 'use_df', 'log_each_event', 'reflect_after_combat', 'include_player_kills', 'enrich_chim_combat', 'enrich_death_line'];
         $values = [];
         foreach ($bools as $key) {
             $values[$key] = isset($_POST[$key]) ? '1' : '0';
@@ -165,6 +165,7 @@ function cgModRow(string $label, bool $known, bool $loaded, string $version, str
       <tr><td>This session: kills checked / gory / saved to CHIM memory</td><td><?= (int)($status['kills_seen'] ?? 0) ?> / <?= (int)($status['gore_events'] ?? 0) ?> / <?= (int)($status['logged_to_chim'] ?? 0) ?></td></tr>
       <tr><td>Reaction requests: from game / allowed by server</td><td><?= cgH($settings['stat_requests']) ?> / <?= cgH($settings['stat_spoken']) ?></td></tr>
       <tr><td>CHIM's own combat comments enriched with gore</td><td><?= cgH($settings['stat_enriched']) ?></td></tr>
+      <tr><td>CHIM death lines extended with gore</td><td><?= cgH($settings['stat_death_lines']) ?></td></tr>
       <tr><td>Last reaction / cooldown left</td><td><?= $lastTs > 0 ? cgH(date('Y-m-d H:i:s', $lastTs)) : 'never' ?> / <?= $cooldownLeft > 0 ? cgH(ceil($cooldownLeft / 60) . ' min') : 'none' ?></td></tr>
       <?php if (!empty($status['last_error'])): ?><tr><td>Last error in game</td><td class="bad"><?= cgH($status['last_error']) ?></td></tr><?php endif; ?>
     </table>
@@ -188,6 +189,7 @@ function cgModRow(string $label, bool $known, bool $loaded, string $version, str
     <section>
       <h2>In game</h2>
       <label class="check"><input type="checkbox" name="log_each_event" value="1" <?= cgChecked($settings, 'log_each_event') ?>> Save each gory kill to CHIM's memory (nearby NPCs will know)</label>
+      <label class="check"><input type="checkbox" name="enrich_death_line" value="1" <?= cgChecked($settings, 'enrich_death_line') ?>> Append it to CHIM's own death line (shown in Prisma's recent context)</label>
       <label class="check"><input type="checkbox" name="reflect_after_combat" value="1" <?= cgChecked($settings, 'reflect_after_combat') ?>> A follower may react after the fight</label>
       <label class="check"><input type="checkbox" name="include_player_kills" value="1" <?= cgChecked($settings, 'include_player_kills') ?>> Count the player's own kills too (not only followers')</label>
       <div class="row">

@@ -2,7 +2,7 @@
   "name": "chim_gore",
   "display_name": "CHIM Gore",
   "description": "Followers notice and remember decapitations and dismemberments (Next-Gen Decapitations, Dismembering Framework) and one of them reacts after the fight.",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "schema_version": 2,
   "config_url": "/HerikaServer/ext/chim_gore/index.php",
   "config_url_target": "_blank",

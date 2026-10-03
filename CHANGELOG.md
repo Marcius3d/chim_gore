@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Fix: kills by followers were credited to the player ("Martin severed …"). Skyrim's death event often names the player. CHIM Gore now trusts the last weapon hit, as CHIM does. As a safety net, the server also corrects the name from CHIM's own death line.
+- Fix: gore events were visible only to the player, because CHIM limited them to the names in the sentence. They now carry the people of the death event, so followers see them in their context.
+- New: the gore is appended to CHIM's own death line for that victim (`… has defeated Bandit Vanguard using weapon Iron Sword — Sapphire severed the Bandit Vanguard's left forearm.`), visible in Prisma's recent context and in the event log. Option on the plugin page; on by default.
+- New: power attacks are mentioned. The weapon is the one that struck the blow.
+- New default instruction: a follower who did the cutting talks about their own blow in first person and may address a nearby companion; CHIM's rechat can continue the conversation. A customised instruction is kept.
+
 ## 0.2.2
 
 - Fix: the follower reaction was almost always skipped as "CHIM already commented on this fight". The CHIM combat comment is now recorded only when CHIM really finishes it (`postrequest.php`), not when the request arrives.
