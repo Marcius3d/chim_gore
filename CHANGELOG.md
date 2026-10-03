@@ -3,6 +3,7 @@
 ## 0.3.3
 
 - Summoned and raised creatures (atronachs, spectral helpers, thralls, summoned Dremora) are ignored completely: their kills are not tracked, their deaths are not checked, and they are never picked to react.
+- Plugin page: every setting shows its default value, and a new **Restore all defaults** button resets them. The "Skip if CHIM commented the fight" hint now explains that it is not a wait.
 
 ## 0.3.1
 

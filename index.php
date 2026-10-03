@@ -24,6 +24,22 @@ function cgChecked(array $settings, string $key): string
     return ($settings[$key] ?? '0') === '1' ? 'checked' : '';
 }
 
+// "default: X" next to a setting
+function cgDef(string $key, string $unit = ''): string
+{
+    $d = chimGoreDefaults()[$key] ?? '';
+    return ' <span class="def">default: ' . cgH($d) . cgH($unit) . '</span>';
+}
+
+function cgDefOnOff(string $key): string
+{
+    return ' <span class="def">default: ' . ((chimGoreDefaults()[$key] ?? '0') === '1' ? 'on' : 'off') . '</span>';
+}
+
+const CG_USER_SETTINGS = ['enabled', 'debug', 'use_ngd', 'use_df', 'log_each_event', 'reflect_after_combat', 'include_player_kills',
+    'enrich_chim_combat', 'enrich_death_line', 'check_delay_seconds', 'reflect_delay_min_seconds', 'reflect_delay_max_seconds',
+    'follower_range_units', 'max_summary_lines', 'chance', 'cooldown_minutes', 'min_score', 'skip_after_chim_combat_seconds', 'instruction'];
+
 // Diagnostic file download
 if (isset($_GET['download'])) {
     header('Content-Type: text/plain; charset=utf-8');
@@ -49,6 +65,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'restore_text') {
         chimGoreSetValue('instruction', chimGoreDefaults()['instruction']);
         $message = 'Default instruction restored.';
+    } elseif ($action === 'restore_defaults') {
+        $defaults = chimGoreDefaults();
+        $ok = true;
+        foreach (CG_USER_SETTINGS as $key) {
+            $ok = chimGoreSetValue($key, $defaults[$key]) && $ok;
+        }
+        if ($ok) {
+            $message = 'All settings restored to their defaults.';
+            chimGoreLog('info', 'All settings restored to defaults on the plugin page');
+        } else {
+            $error = 'Some settings could not be restored.';
+        }
     } elseif ($action === 'clear_log') {
         chimGoreLogClear() ? $message = 'Diagnostics log cleared.' : $error = 'Could not clear the log.';
     } else {
@@ -122,6 +150,7 @@ function cgModRow(string $label, bool $known, bool $loaded, string $version, str
   label { display:block; margin: 12px 0 4px; font-weight:600; }
   label.check { font-weight:500; }
   .hint { color:var(--muted); font-size:13px; margin:2px 0 0; }
+  .def { color:var(--muted); font-size:12px; font-weight:normal; white-space:nowrap; }
   input[type=number] { width: 120px; }
   input, textarea, select { background:#0f0c0a; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:8px; font:inherit; }
   textarea { width:100%; min-height:110px; }
@@ -174,41 +203,41 @@ function cgModRow(string $label, bool $known, bool $loaded, string $version, str
   <form method="post">
     <section>
       <h2>General</h2>
-      <label class="check"><input type="checkbox" name="enabled" value="1" <?= cgChecked($settings, 'enabled') ?>> CHIM Gore enabled</label>
-      <label class="check"><input type="checkbox" name="debug" value="1" <?= cgChecked($settings, 'debug') ?>> Debug mode</label>
+      <label class="check"><input type="checkbox" name="enabled" value="1" <?= cgChecked($settings, 'enabled') ?>> CHIM Gore enabled<?= cgDefOnOff('enabled') ?></label>
+      <label class="check"><input type="checkbox" name="debug" value="1" <?= cgChecked($settings, 'debug') ?>> Debug mode<?= cgDefOnOff('debug') ?></label>
       <p class="hint">Shows <code>CHIM-gore: request sent / request failed / request successful</code> in game (where your HUD shows notifications) and writes a detailed log. <code>CHIM-gore: activated</code> is always shown after loading a save.</p>
     </section>
 
     <section>
       <h2>Supported mods</h2>
       <p class="hint">Installed mods are detected automatically; one or both can be used. Untick a mod to ignore it.</p>
-      <label class="check"><input type="checkbox" name="use_ngd" value="1" <?= cgChecked($settings, 'use_ngd') ?>> Use Next-Gen Decapitations (heads, how far the head flew)</label>
-      <label class="check"><input type="checkbox" name="use_df" value="1" <?= cgChecked($settings, 'use_df') ?>> Use Dismembering Framework (heads and limbs, including creature packs)</label>
+      <label class="check"><input type="checkbox" name="use_ngd" value="1" <?= cgChecked($settings, 'use_ngd') ?>> Use Next-Gen Decapitations (heads, how far the head flew)<?= cgDefOnOff('use_ngd') ?></label>
+      <label class="check"><input type="checkbox" name="use_df" value="1" <?= cgChecked($settings, 'use_df') ?>> Use Dismembering Framework (heads and limbs, including creature packs)<?= cgDefOnOff('use_df') ?></label>
     </section>
 
     <section>
       <h2>In game</h2>
-      <label class="check"><input type="checkbox" name="log_each_event" value="1" <?= cgChecked($settings, 'log_each_event') ?>> Save each gory kill to CHIM's memory (nearby NPCs will know)</label>
-      <label class="check"><input type="checkbox" name="enrich_death_line" value="1" <?= cgChecked($settings, 'enrich_death_line') ?>> Append it to CHIM's own death line (shown in Prisma's recent context)</label>
-      <label class="check"><input type="checkbox" name="reflect_after_combat" value="1" <?= cgChecked($settings, 'reflect_after_combat') ?>> A follower may react after the fight</label>
-      <label class="check"><input type="checkbox" name="include_player_kills" value="1" <?= cgChecked($settings, 'include_player_kills') ?>> Count the player's own kills too (not only followers')</label>
+      <label class="check"><input type="checkbox" name="log_each_event" value="1" <?= cgChecked($settings, 'log_each_event') ?>> Save each gory kill to CHIM's memory (nearby NPCs will know)<?= cgDefOnOff('log_each_event') ?></label>
+      <label class="check"><input type="checkbox" name="enrich_death_line" value="1" <?= cgChecked($settings, 'enrich_death_line') ?>> Append it to CHIM's own death line (shown in Prisma's recent context)<?= cgDefOnOff('enrich_death_line') ?></label>
+      <label class="check"><input type="checkbox" name="reflect_after_combat" value="1" <?= cgChecked($settings, 'reflect_after_combat') ?>> A follower may react after the fight<?= cgDefOnOff('reflect_after_combat') ?></label>
+      <label class="check"><input type="checkbox" name="include_player_kills" value="1" <?= cgChecked($settings, 'include_player_kills') ?>> Count the player's own kills too (not only followers')<?= cgDefOnOff('include_player_kills') ?></label>
       <div class="row">
-        <div><label>Check delay after death (s)</label><input type="number" step="0.5" name="check_delay_seconds" min="0.5" max="10" value="<?= cgH($settings['check_delay_seconds']) ?>"></div>
-        <div><label>Reaction delay after combat (s)</label><input type="number" name="reflect_delay_min_seconds" min="0" max="600" value="<?= cgH($settings['reflect_delay_min_seconds']) ?>"> – <input type="number" name="reflect_delay_max_seconds" min="0" max="600" value="<?= cgH($settings['reflect_delay_max_seconds']) ?>"></div>
-        <div><label>Follower range (units, 70 ≈ 1 m)</label><input type="number" name="follower_range_units" min="200" max="20000" value="<?= cgH($settings['follower_range_units']) ?>"></div>
-        <div><label>Moments described per fight</label><input type="number" name="max_summary_lines" min="1" max="6" value="<?= cgH($settings['max_summary_lines']) ?>"></div>
+        <div><label>Check delay after death (s)<?= cgDef('check_delay_seconds', ' s') ?></label><input type="number" step="0.5" name="check_delay_seconds" min="0.5" max="10" value="<?= cgH($settings['check_delay_seconds']) ?>"></div>
+        <div><label>Reaction delay after combat (s) <span class="def">default: <?= cgH(chimGoreDefaults()['reflect_delay_min_seconds']) ?>–<?= cgH(chimGoreDefaults()['reflect_delay_max_seconds']) ?> s</span></label><input type="number" name="reflect_delay_min_seconds" min="0" max="600" value="<?= cgH($settings['reflect_delay_min_seconds']) ?>"> – <input type="number" name="reflect_delay_max_seconds" min="0" max="600" value="<?= cgH($settings['reflect_delay_max_seconds']) ?>"></div>
+        <div><label>Follower range (units, 70 ≈ 1 m)<?= cgDef('follower_range_units', '') ?></label><input type="number" name="follower_range_units" min="200" max="20000" value="<?= cgH($settings['follower_range_units']) ?>"></div>
+        <div><label>Moments described per fight<?= cgDef('max_summary_lines', '') ?></label><input type="number" name="max_summary_lines" min="1" max="6" value="<?= cgH($settings['max_summary_lines']) ?>"></div>
       </div>
     </section>
 
     <section>
       <h2>After-combat reaction</h2>
-      <label class="check"><input type="checkbox" name="enrich_chim_combat" value="1" <?= cgChecked($settings, 'enrich_chim_combat') ?>> Add the fight's gore to CHIM's own combat-end comment</label>
+      <label class="check"><input type="checkbox" name="enrich_chim_combat" value="1" <?= cgChecked($settings, 'enrich_chim_combat') ?>> Add the fight's gore to CHIM's own combat-end comment<?= cgDefOnOff('enrich_chim_combat') ?></label>
       <p class="hint">CHIM often comments on a finished fight by itself. With this on, that comment also gets the decapitations and severed limbs of the fight, so the follower can talk about them even when CHIM Gore's own reaction is skipped.</p>
       <div class="row">
-        <div><label>Chance (%)</label><input type="number" name="chance" min="0" max="100" value="<?= cgH($settings['chance']) ?>"><p class="hint">Of qualifying fights, how many get a comment.</p></div>
-        <div><label>Cooldown (real minutes)</label><input type="number" name="cooldown_minutes" min="0" max="1440" value="<?= cgH($settings['cooldown_minutes']) ?>"><p class="hint">Minimum time between two comments.</p></div>
-        <div><label>Minimum gore score</label><input type="number" name="min_score" min="0" max="50" value="<?= cgH($settings['min_score']) ?>"><p class="hint">Head = 6 (+1 per 2 m it flew), limb = 2, finishing move = 1.</p></div>
-        <div><label>Skip if CHIM commented the fight (s)</label><input type="number" name="skip_after_chim_combat_seconds" min="0" max="600" value="<?= cgH($settings['skip_after_chim_combat_seconds']) ?>"><p class="hint">Avoids two comments on the same fight. 0 = never skip.</p></div>
+        <div><label>Chance (%)<?= cgDef('chance', ' %') ?></label><input type="number" name="chance" min="0" max="100" value="<?= cgH($settings['chance']) ?>"><p class="hint">Of qualifying fights, how many get a comment.</p></div>
+        <div><label>Cooldown (real minutes)<?= cgDef('cooldown_minutes', ' min') ?></label><input type="number" name="cooldown_minutes" min="0" max="1440" value="<?= cgH($settings['cooldown_minutes']) ?>"><p class="hint">Minimum time between two comments.</p></div>
+        <div><label>Minimum gore score<?= cgDef('min_score', '') ?></label><input type="number" name="min_score" min="0" max="50" value="<?= cgH($settings['min_score']) ?>"><p class="hint">Head = 6 (+1 per 2 m it flew), limb = 2, finishing move = 1.</p></div>
+        <div><label>Skip if CHIM commented the fight (s)<?= cgDef('skip_after_chim_combat_seconds', ' s') ?></label><input type="number" name="skip_after_chim_combat_seconds" min="0" max="600" value="<?= cgH($settings['skip_after_chim_combat_seconds']) ?>"><p class="hint">Not a wait. If CHIM itself commented on the fight within this many seconds, the CHIM Gore reaction is skipped so nobody talks twice. Keep it longer than the reaction delay. 0 = never skip.</p></div>
       </div>
       <label for="instruction">Instruction sent to the follower</label>
       <textarea id="instruction" name="instruction"><?= cgH($settings['instruction']) ?></textarea>
@@ -219,6 +248,7 @@ function cgModRow(string $label, bool $known, bool $loaded, string $version, str
       <button type="submit" name="action" value="save">Save settings</button>
       <button type="submit" name="action" value="restore_text" class="secondary">Restore default instruction</button>
       <button type="submit" name="action" value="reset_cooldown" class="secondary">Reset cooldown</button>
+      <button type="submit" name="action" value="restore_defaults" class="secondary" onclick="return confirm('Restore all settings to their defaults?');">Restore all defaults</button>
     </div>
   </form>
 
