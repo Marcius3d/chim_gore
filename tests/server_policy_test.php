@@ -8,8 +8,18 @@ final class ChimGoreFakeDb
     public array $rows = [];
     public array $log = [];
 
+    public ?array $deathRow = null;
+    public array $updates = [];
+
     public function fetchOne($q, array $p = [])
     {
+        if (str_contains($q, "type = 'death'")) {
+            return $this->deathRow ?? [];
+        }
+        if (str_starts_with($q, 'UPDATE eventlog')) {
+            $this->updates[] = $p;
+            return ['rowid' => $p[1]];
+        }
         if (str_contains($q, 'to_regclass')) {
             return ['t' => $p[0] ?? 'x'];
         }
@@ -81,7 +91,7 @@ check('other request types ignored', chimGoreHandleRequest(['inputtext', '1', '2
 chimGoreSetValue('chance', '100');
 $first = chimGoreHandleRequest($request);
 check('allowed when chance 100', $first['allow'] === true);
-check('instruction rewritten', str_contains($first['data'], 'Serana briefly reacts') && str_contains($first['data'], '6 meters'));
+check('instruction rewritten', str_contains($first['data'], 'Serana reacts out loud') && str_contains($first['data'], '6 meters'));
 check('marker removed', !str_contains($first['data'], '[chim_gore'));
 check('cooldown blocks second', chimGoreHandleRequest($request)['allow'] === false);
 
@@ -126,6 +136,17 @@ chimGoreSetValue('enabled', '0');
 check('disabled blocks', chimGoreHandleRequest($request)['allow'] === false);
 chimGoreSetValue('enabled', '1');
 check('unknown key rejected', chimGoreSetValue('evil', 'x') === false);
+
+// info_gore events: appended to CHIM's death line, killer corrected from CHIM's line
+$GLOBALS['db']->deathRow = ['rowid' => 42, 'data' => '(Context location: Fort Greymoor)Sapphire has defeated Bandit Vanguard using weapon Iron Sword', 'people' => '|Sapphire|Ashe|Martin|'];
+$ev = ['info_gore', '1', '2', '[gore victim="Bandit Vanguard" killer="Martin"] Martin severed the Bandit Vanguard\'s left forearm.'];
+check('gore event handled', chimGoreHandleGoreEvent($ev) === true);
+check('killer corrected from CHIM death line', $ev[3] === "Sapphire severed the Bandit Vanguard's left forearm.");
+check('death line updated', ($GLOBALS['db']->updates[0][1] ?? 0) === 42 && str_contains($GLOBALS['db']->updates[0][0], 'Sapphire severed'));
+$GLOBALS['db']->deathRow = null;
+$ev2 = ['info_gore', '1', '2', 'plain text without marker'];
+check('event without marker is left to CHIM', chimGoreHandleGoreEvent($ev2) === false && $ev2[3] === 'plain text without marker');
+check('new default instruction mentions first person', str_contains(chimGoreGetSettings()['instruction'], 'first person'));
 
 // Config for the game
 chimGoreSetValue('debug', '1');
