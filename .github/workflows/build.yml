@@ -5,13 +5,20 @@ on:
     branches: [main]
     tags: ["v*"]
   pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Attach the MO2 zip to this existing release tag (optional)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
 
 concurrency:
-  group: build-${{ github.ref }}
+  group: build-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -81,9 +88,33 @@ jobs:
             dist/*
             SkyrimPlugin/build/release/CHIMGore.pdb
 
-      - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Get-Content manifest.json -Raw | ConvertFrom-Json).version
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Attach files to the release
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}
           files: dist/*
-          generate_release_notes: true
+          make_latest: true
+          body: |
+            ## Download
+
+            **Mod Organizer 2 / Vortex:** [CHIM-Gore-${{ steps.version.outputs.version }}.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name || inputs.release_tag || github.ref_name }}/CHIM-Gore-${{ steps.version.outputs.version }}.zip)
+            Install it with *Install a new mod from an archive*. CHIM installs the server part automatically on the next game start.
+
+            Always the newest version: https://github.com/${{ github.repository }}/releases/latest/download/CHIM-Gore.zip
+
+            | File | What it is |
+            |---|---|
+            | `CHIM-Gore-${{ steps.version.outputs.version }}.zip` / `CHIM-Gore.zip` | **The mod for MO2/Vortex** (DLL, INI and the embedded server package) |
+            | `chim_gore-${{ steps.version.outputs.version }}.dwpkg` | Server package only (CHIM installs it automatically) |
+            | `chim_gore.tar.gz` | Server files for the CHIM *Server Plugins* update button |
+            | Source code | Not needed to play |
+
+            What changed: see [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).
