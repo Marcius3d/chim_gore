@@ -8,7 +8,7 @@ Without it, CHIM only records *"Serana killed Bandit"*. With it, CHIM learns *"S
 
 > "Did you see that? His head went halfway across the room. I may have overdone it."
 
-> **Status: 0.3.0, beta.** The packages build in CI and the server side is tested against PostgreSQL. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
+> **Status: 0.3.3, beta.** Tested in game on Skyrim SE 1.5.97 (Nolvus) with NGD 1.2.0 and DF 1.0.6: decapitations and severed limbs are credited to the right follower, saved in CHIM memory, and a follower reacts after the fight. Please report results from other setups (see [Feedback](#feedback)).
 
 
 ## ⬇ Download
@@ -117,6 +117,7 @@ Everything is configured on the CHIM web page: **Server Plugins** → *CHIM Gore
 
 ## Compatibility notes
 
+- Summoned and raised creatures (atronachs, spectral helpers, thralls) are ignored: their kills, their deaths and their reactions are not tracked.
 - Followers are addressed by name when asking CHIM for a reaction. If two followers share the same name, CHIM may pick the other one.
 - Works alongside CHIM's normal *combat end* comments. If you find them too chatty together, lower CHIM's combat-comment chance or this add-on's chance.
 - Limb detection covers the node names from Dismembering Framework's official humanoid pack. Creature packs with other node names will still report heads, but not every limb.

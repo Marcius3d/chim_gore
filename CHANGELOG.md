@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- Summoned and raised creatures (atronachs, spectral helpers, thralls, summoned Dremora) are ignored completely: their kills are not tracked, their deaths are not checked, and they are never picked to react.
+
 ## 0.3.1
 
 - Fix: the server could take the `(Context location: …)` part of CHIM's death line for the killer's name.

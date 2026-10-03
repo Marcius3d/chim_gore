@@ -54,7 +54,7 @@ using namespace std::chrono_literals;
 
 namespace
 {
-    constexpr const char* kPluginVersion = "0.3.1";
+    constexpr const char* kPluginVersion = "0.3.3";
     constexpr const char* kNotifyPrefix = "CHIM-gore: ";
     constexpr const char* kNgdPlugin = "Next-Gen Decapitations.esp";
     constexpr const char* kDfPlugin = "Dismembering Framework.esm";
@@ -570,7 +570,7 @@ namespace
         const std::string& body, std::string* response, int timeoutMs = 3000)
     {
         bool ok = false;
-        HINTERNET session = WinHttpOpen(L"CHIMGore/0.3.1", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        HINTERNET session = WinHttpOpen(L"CHIMGore/0.3.3", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (!session) {
             return false;
         }
@@ -1045,9 +1045,22 @@ namespace
         return player->GetPosition().GetDistance(actor->GetPosition());
     }
 
+    // Summoned or raised creatures (atronachs, spectral helpers, thralls) are never tracked.
+    bool IsSummon(RE::Actor* actor)
+    {
+        if (!actor || actor->IsPlayerRef()) {
+            return false;
+        }
+        if (actor->GetCommandingActor().get()) {
+            return true;
+        }
+        auto base = actor->GetActorBase();
+        return base && base->actorData.actorBaseFlags.all(RE::ACTOR_BASE_DATA::Flag::kSummonable);
+    }
+
     bool IsUsableFollower(RE::Actor* actor)
     {
-        return actor && !actor->IsPlayerRef() && actor->IsPlayerTeammate() && !actor->IsDead() &&
+        return actor && !actor->IsPlayerRef() && actor->IsPlayerTeammate() && !IsSummon(actor) && !actor->IsDead() &&
                !actor->IsDisabled() && actor->Is3DLoaded() &&
                DistanceToPlayer(actor) <= g_settings.followerRangeUnits;
     }
@@ -1577,18 +1590,31 @@ namespace
             RE::TESObjectWEAP* hitWeapon = nullptr;
             bool powerAttack = false;
             bool killerFromHit = false;
-            if (auto hit = RecentHit(victim->GetFormID())) {
-                if (auto striker = hit->aggressor.get()) {
-                    if (striker.get() != killer) {
-                        logger::debug("Death event names {}, last hit was by {}", killer ? ActorName(killer) : "nobody", ActorName(striker.get()));
-                    }
-                    killer = striker.get();
-                    killerFromHit = true;
-                }
-                hitWeapon = RE::TESForm::LookupByID<RE::TESObjectWEAP>(hit->weapon);
-                powerAttack = hit->powerAttack;
+            if (IsSummon(victim)) {
+                return RE::BSEventNotifyControl::kContinue;
             }
-            if (!killer || victim == killer) {
+            RE::NiPointer<RE::Actor> strikerHold;
+            if (auto hit = RecentHit(victim->GetFormID())) {
+                strikerHold = hit->aggressor.get();
+                RE::Actor* striker = strikerHold.get();
+                if (striker && IsSummon(striker)) {
+                    // Finished off by a summon: not tracked at all.
+                    return RE::BSEventNotifyControl::kContinue;
+                }
+                if (striker && !striker->IsPlayerRef() && !striker->IsPlayerTeammate()) {
+                    striker = nullptr;  // someone outside the party: keep the death event's killer
+                }
+                if (striker) {
+                    if (striker != killer) {
+                        logger::debug("Death event names {}, last hit was by {}", killer ? ActorName(killer) : "nobody", ActorName(striker));
+                    }
+                    killer = striker;
+                    killerFromHit = true;
+                    hitWeapon = RE::TESForm::LookupByID<RE::TESObjectWEAP>(hit->weapon);
+                    powerAttack = hit->powerAttack;
+                }
+            }
+            if (!killer || victim == killer || IsSummon(killer)) {
                 return RE::BSEventNotifyControl::kContinue;
             }
             const bool killerIsPlayer = killer->IsPlayerRef();
