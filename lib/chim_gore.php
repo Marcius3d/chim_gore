@@ -10,7 +10,7 @@ if (defined('CHIM_GORE_VERSION')) {
     return;
 }
 
-define('CHIM_GORE_VERSION', '0.2.1');
+define('CHIM_GORE_VERSION', '0.2.2');
 define('CHIM_GORE_TABLE', 'plugins.chim_gore_settings');
 define('CHIM_GORE_LOG_TABLE', 'plugins.chim_gore_log');
 define('CHIM_GORE_LOG_KEEP', 2000);
@@ -58,6 +58,7 @@ function chimGoreDefaults(): array
         'cooldown_minutes' => '10',    // real-time minutes between comments
         'min_score' => '4',            // 6 = any decapitation, 2 = one limb
         'skip_after_chim_combat_seconds' => '45', // skip if CHIM itself just commented the fight
+        'enrich_chim_combat' => '1',   // add this fight's gore to CHIM's own combat-end comment
         'instruction' => '{NPC} briefly reacts to the most gruesome moment of the fight that just ended, '
             . 'in their own voice and personality: shocked, amused, disgusted or proud, whatever fits them. '
             . 'One or two short sentences. Only mention injuries listed here. What happened: {DETAILS}',
@@ -66,6 +67,8 @@ function chimGoreDefaults(): array
         'last_chim_combat_ts' => '0',
         'stat_requests' => '0',
         'stat_spoken' => '0',
+        'stat_enriched' => '0',
+        'reflect_token_ts' => '0',
         'game_status' => '',
         'game_status_ts' => '0',
     ];
@@ -347,20 +350,49 @@ function chimGoreBuildInstruction(array $settings, string $npcName, string $deta
     return strtr($template, ['{NPC}' => $npcName !== '' ? $npcName : 'The follower', '{DETAILS}' => $details]);
 }
 
+/** Human-readable reason, also shown in game. */
+function chimGoreReasonText(string $reason): string
+{
+    return [
+        'ok' => 'allowed',
+        'disabled' => 'reactions are turned off',
+        'score_below_minimum' => 'not gory enough',
+        'chim_already_commented' => 'CHIM already commented on this fight',
+        'cooldown' => 'cooldown',
+        'chance' => 'chance roll',
+    ][$reason] ?? $reason;
+}
+
 /**
- * Called from prerequest.php (after the NPC profile is loaded) for every request. Returns:
+ * Asked by CHIMGore.dll (api/decide.php) before it requests a reaction, so the game can show the
+ * real outcome. An allowed decision leaves a short-lived token that prerequest.php consumes.
+ */
+function chimGoreDecideForGame(int $score, string $npc): array
+{
+    $settings = chimGoreGetSettings();
+    chimGoreIncrement('stat_requests');
+    [$allowed, $reason] = chimGoreDecide($settings, ['score' => $score]);
+    if (!$allowed) {
+        chimGoreLog('info', "Reaction for {$npc} skipped: " . chimGoreReasonText($reason) . " (score {$score})");
+        return [false, $reason];
+    }
+    $now = (string)time();
+    chimGoreSetValue('last_reflect_ts', $now);
+    chimGoreSetValue('reflect_token_ts', $now);
+    chimGoreIncrement('stat_spoken');
+    chimGoreLog('info', "Reaction for {$npc} allowed (score {$score})");
+    return [true, 'ok'];
+}
+
+/**
+ * Called from prerequest.php (after the NPC profile is loaded) for "instruction" requests. Returns:
  *   null                            - not ours, continue normally
  *   ['allow'=>false]                - drop the request (terminate)
  *   ['allow'=>true,'data'=>string]  - continue with the rewritten instruction
  */
 function chimGoreHandleRequest(array $gameRequest): ?array
 {
-    $type = (string)($gameRequest[0] ?? '');
-    if ($type === 'combatend' || $type === 'combatendmighty') {
-        chimGoreSetValue('last_chim_combat_ts', (string)time());
-        return null;
-    }
-    if ($type !== 'instruction' || !isset($gameRequest[3])) {
+    if ((string)($gameRequest[0] ?? '') !== 'instruction' || !isset($gameRequest[3])) {
         return null;
     }
     $parsed = chimGoreParseRequest((string)$gameRequest[3]);
@@ -368,17 +400,78 @@ function chimGoreHandleRequest(array $gameRequest): ?array
         return null;
     }
     $settings = chimGoreGetSettings();
-    chimGoreIncrement('stat_requests');
     $npc = (string)($GLOBALS['HERIKA_NAME'] ?? '');
-    [$allowed, $reason] = chimGoreDecide($settings, $parsed['values']);
-    if (!$allowed) {
-        chimGoreLog('info', "Reaction for {$npc} skipped ({$reason}), score {$parsed['values']['score']}");
-        return ['allow' => false];
+    $token = (int)$settings['reflect_token_ts'];
+    if ($token > 0 && time() - $token < 120) {
+        // Already decided via api/decide.php: do not roll again.
+        chimGoreSetValue('reflect_token_ts', '0');
+    } else {
+        // Older game plugin or decide endpoint unreachable: decide here.
+        chimGoreIncrement('stat_requests');
+        [$allowed, $reason] = chimGoreDecide($settings, $parsed['values']);
+        if (!$allowed) {
+            chimGoreLog('info', "Reaction for {$npc} skipped: " . chimGoreReasonText($reason) . ", score {$parsed['values']['score']}");
+            return ['allow' => false];
+        }
+        chimGoreSetValue('last_reflect_ts', (string)time());
+        chimGoreIncrement('stat_spoken');
     }
-    chimGoreSetValue('last_reflect_ts', (string)time());
-    chimGoreIncrement('stat_spoken');
-    chimGoreLog('info', "Reaction allowed for {$npc}, score {$parsed['values']['score']}: {$parsed['details']}");
+    chimGoreLog('info', "Reaction sent to CHIM for {$npc}: {$parsed['details']}");
     return ['allow' => true, 'data' => $parsed['prefix'] . chimGoreBuildInstruction($settings, $npc, $parsed['details'])];
+}
+
+/** Gory events of the last fight, newest first (from CHIM's event log). */
+function chimGoreRecentGore(int $seconds = 180, int $limit = 3): array
+{
+    $db = chimGoreDb();
+    if (!$db) {
+        return [];
+    }
+    try {
+        $rows = $db->fetchAll("SELECT data FROM eventlog WHERE type = 'info_gore' AND localts > "
+            . (time() - max(10, $seconds)) . ' ORDER BY rowid DESC LIMIT ' . max(1, min(6, $limit)));
+        $out = [];
+        foreach ((array)$rows as $row) {
+            $text = trim(preg_replace('/^\(Context[^)]*\)/', '', (string)($row['data'] ?? '')));
+            if ($text !== '') {
+                $out[] = $text;
+            }
+        }
+        return $out;
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/** prompts.php: add this fight's gore to CHIM's own combat-end comment. */
+function chimGoreEnrichCombatPrompt(string $type): void
+{
+    if (($type !== 'combatend' && $type !== 'combatendmighty') || !isset($GLOBALS['PROMPTS'][$type]['cue'])) {
+        return;
+    }
+    $settings = chimGoreGetSettings();
+    if ($settings['enabled'] !== '1' || $settings['enrich_chim_combat'] !== '1') {
+        return;
+    }
+    $gore = chimGoreRecentGore();
+    if (!$gore) {
+        return;
+    }
+    $note = ' (Gruesome details of this fight: ' . implode(' ', array_reverse($gore))
+        . ' Mention the most gruesome moment in the comment.)';
+    foreach ($GLOBALS['PROMPTS'][$type]['cue'] as $i => $cue) {
+        $GLOBALS['PROMPTS'][$type]['cue'][$i] = $cue . $note;
+    }
+    chimGoreIncrement('stat_enriched');
+    chimGoreLog('info', 'Added ' . count($gore) . " gore event(s) to CHIM's combat comment");
+}
+
+/** postrequest.php: CHIM really produced its own combat-end comment. */
+function chimGoreNoteChimCombatComment(string $type): void
+{
+    if ($type === 'combatend' || $type === 'combatendmighty') {
+        chimGoreSetValue('last_chim_combat_ts', (string)time());
+    }
 }
 
 // ---------------------------------------------------------------------------------------
