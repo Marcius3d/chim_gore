@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: PHP lint
-        run: for f in *.php lib/*.php tests/*.php; do php -l "$f"; done
+        run: for f in *.php lib/*.php api/*.php tests/*.php; do php -l "$f"; done
       - name: Policy tests
         run: php tests/server_policy_test.php
       - name: Version check
