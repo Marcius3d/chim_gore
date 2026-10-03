@@ -7,7 +7,7 @@
   "config_url": "/HerikaServer/ext/chim_gore/index.php",
   "config_url_target": "_blank",
   "git_repo": "Marcius3d/chim_gore",
-  "mod_download_url": "https://github.com/Marcius3d/chim_gore/releases/download/v<version>/CHIM-Gore-<version>.zip",
+  "mod_download_url": "https://github.com/Marcius3d/chim_gore/releases/latest/download/CHIM-Gore.zip",
   "default_channel": "main",
   "channels": {
     "main": {

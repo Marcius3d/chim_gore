@@ -10,6 +10,13 @@ Without it, CHIM only records *"Serana killed Bandit"*. With it, CHIM learns *"S
 
 > **Status: 0.2.0, beta.** The packages build in CI and the server side is tested against PostgreSQL. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
 
+
+## ⬇ Download
+
+**[Download the latest CHIM Gore for MO2 / Vortex (CHIM-Gore.zip)](https://github.com/Marcius3d/chim_gore/releases/latest/download/CHIM-Gore.zip)**
+
+This link always points to the newest release. Older versions are on the [Releases](https://github.com/Marcius3d/chim_gore/releases) page; use the `CHIM-Gore-<version>.zip` file, not *Source code*.
+
 ---
 
 ## What it does
@@ -52,7 +59,7 @@ Both gore mods are optional, but with neither installed this add-on does nothing
 
 ## Installation
 
-1. Download `CHIM-Gore-<version>.zip` from [Releases](https://github.com/Marcius3d/chim_gore/releases).
+1. Download **[CHIM-Gore.zip](https://github.com/Marcius3d/chim_gore/releases/latest/download/CHIM-Gore.zip)** (latest release). Do not use the *Source code* archives.
 2. Install it with Mod Organizer 2 or Vortex like any other mod. Load order does not matter.
 3. Start the game with the CHIM server running. CHIM finds the embedded server package (`CHIM/server-plugins/chim_gore/`) and installs it on the server automatically.
 4. A few seconds after the save loads you should see `CHIM-gore: activated (…)`.
@@ -116,7 +123,7 @@ Everything is configured on the CHIM web page: **Server Plugins** → *CHIM Gore
 
 ## Building from source
 
-The GitHub Actions workflow in `.github/workflows/build.yml` builds everything on each push. Tagging `vX.Y.Z` publishes a release.
+The GitHub Actions workflow in `.github/workflows/build.yml` builds everything on each push. Publishing a GitHub release (any tag name) builds the mod and attaches `CHIM-Gore-<version>.zip`, `CHIM-Gore.zip`, the `.dwpkg` and `chim_gore.tar.gz` to it. The release notes get download links automatically. Tags starting with `v` also do this.
 
 Locally on Windows (Visual Studio 2022, CMake, Ninja, vcpkg with `VCPKG_ROOT` set):
 
@@ -156,3 +163,7 @@ Please open an [issue](https://github.com/Marcius3d/chim_gore/issues) or post in
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+---
+
+**⬇ [Download the latest CHIM-Gore.zip for MO2 / Vortex](https://github.com/Marcius3d/chim_gore/releases/latest/download/CHIM-Gore.zip)** · [All releases](https://github.com/Marcius3d/chim_gore/releases)
