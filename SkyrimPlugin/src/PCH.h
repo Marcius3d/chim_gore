@@ -4,3 +4,7 @@
 // other headers (including the generated plugin-version file).
 #include <RE/Skyrim.h>
 #include <SKSE/SKSE.h>
+
+#include <string_view>
+
+using namespace std::literals;

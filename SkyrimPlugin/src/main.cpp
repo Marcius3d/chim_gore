@@ -678,8 +678,9 @@ namespace
             return -1.0f;
         }
         float meters = -1.0f;
-        tes->ForEachReferenceInRange(victim, g_settings.headSearchRadiusUnits, [&](RE::TESObjectREFR* ref) {
-            if (!ref || ref->GetBaseObject() != g_mods.ngdRefActivator) {
+        tes->ForEachReferenceInRange(victim, g_settings.headSearchRadiusUnits, [&](RE::TESObjectREFR& candidate) {
+            RE::TESObjectREFR* ref = &candidate;
+            if (ref->GetBaseObject() != g_mods.ngdRefActivator) {
                 return RE::BSContainer::ForEachResult::kContinue;
             }
             auto body = ref->GetLinkedRef(g_mods.ngdActorKeyword);
