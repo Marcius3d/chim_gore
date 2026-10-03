@@ -8,7 +8,7 @@ Without it, CHIM only records *"Serana killed Bandit"*. With it, CHIM learns *"S
 
 > "Did you see that? His head went halfway across the room. I may have overdone it."
 
-> **Status: 0.1.0, beta.** The packages build and the server side is unit-tested. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
+> **Status: 0.2.0, beta.** The packages build in CI and the server side is tested against PostgreSQL. The game-side behaviour has not been confirmed in game yet. Please report results (see [Feedback](#feedback)).
 
 ---
 
@@ -25,8 +25,19 @@ Gore score: severed head = 6 (+1 for every 2 m the head flew, up to +5), each li
 Detected injuries:
 
 - Head (Next-Gen Decapitations, or Dismembering Framework's neck node)
-- Left and right forearm, left and right leg, and tail (Dismembering Framework official humanoid pack)
-- How far the severed head flew (Next-Gen Decapitations)
+- Every limb node of the installed Dismembering Framework packs (humanoid forearms and legs, tails, creature packs). The node list is read from the packs' JSON files at startup.
+- How far the severed head flew (Next-Gen Decapitations; sampled several times while the head rolls)
+
+## In-game messages
+
+- `CHIM-gore: activated (Next-Gen Decapitations + Dismembering Framework)` is always shown a few seconds after a save loads. If no supported mod is active, the message says so.
+- With **debug mode** on (CHIM web page or INI):
+  - `CHIM-gore: request sent (…)`: the gore mods are being asked about a fresh corpse.
+  - `CHIM-gore: request failed (reason)`: a gore mod or CHIM could not be reached, or Papyrus did not answer within 5 s.
+  - `CHIM-gore: request successful`: the event was accepted into CHIM's memory.
+  - Reaction requests after combat are reported the same way.
+
+Messages appear wherever your HUD shows notifications: top left in vanilla, top right with SkyHUD (for example in Nolvus), next to CHIM's and NFF's own messages.
 
 ## Requirements
 
@@ -44,7 +55,8 @@ Both gore mods are optional, but with neither installed this add-on does nothing
 1. Download `CHIM-Gore-<version>.zip` from [Releases](https://github.com/Marcius3d/chim_gore/releases).
 2. Install it with Mod Organizer 2 or Vortex like any other mod. Load order does not matter.
 3. Start the game with the CHIM server running. CHIM finds the embedded server package (`CHIM/server-plugins/chim_gore/`) and installs it on the server automatically.
-4. Optional: open the CHIM web UI → **Server Plugins** → *CHIM Gore* → **Plugin Page** to change chance, cooldown and wording.
+4. A few seconds after the save loads you should see `CHIM-gore: activated (…)`.
+5. Optional: open the CHIM web UI → **Server Plugins** → *CHIM Gore* → **Plugin Page** to change settings.
 
 **Updating:** install the new zip over the old one. The server part updates on the next game start, or via the **Update** button in Server Plugins.
 
@@ -52,26 +64,23 @@ Both gore mods are optional, but with neither installed this add-on does nothing
 
 ## Settings
 
-### Game side: `Data/SKSE/Plugins/CHIMGore.ini`
+Everything is configured on the CHIM web page: **Server Plugins** → *CHIM Gore* → **Plugin Page**. The game picks up changes within 30 seconds.
 
-| Key | Default | Meaning |
-|---|---|---|
-| `bEnabled` | 1 | Master switch |
-| `bLogEachEvent` | 1 | Write each gory kill into CHIM's memory |
-| `bReflectAfterCombat` | 1 | Ask a follower to react after combat |
-| `bIncludePlayerKills` | 1 | Also count the player's own decapitations |
-| `bDebugNotifications` | 0 | On-screen notifications for testing |
-| `fCheckDelaySeconds` | 2.5 | Wait after a death before checking (the head is still flying) |
-| `fReflectDelayMinSeconds` / `Max` | 8 / 20 | Random delay after combat |
-| `fFollowerRangeUnits` | 3000 | How close a follower must be (70 units ≈ 1 m) |
-| `iMaxSummaryLines` | 3 | How many gory moments are described |
+| Section | Options |
+|---|---|
+| Status | game plugin connected, detected mods and versions, counters, last error |
+| General | enable, **debug mode** |
+| Supported mods | use Next-Gen Decapitations, use Dismembering Framework (both are detected automatically; untick to ignore one) |
+| In game | save each kill to CHIM memory, follower reaction, count player kills, delays, follower range |
+| After-combat reaction | chance, cooldown, minimum gore score, skip when CHIM already commented the fight, instruction text |
+| Diagnostics | **Create diagnostic file** (one .txt to attach to a bug report), server and game log viewer, clear log |
 
-### Server side: CHIM web UI → Server Plugins → CHIM Gore
+`Data/SKSE/Plugins/CHIMGore.ini` holds the same game options. They are used only while the server plugin cannot be reached. The `[Server]` section can override the server address, which is normally read from `AIAgent.ini` or discovered the same way CHIM does it.
 
-- Enable or disable after-combat reactions
-- Chance (%), cooldown (real minutes), minimum gore score
-- The instruction text sent to the follower (`{NPC}`, `{DETAILS}` placeholders)
-- Counters, last reaction time, cooldown reset
+### Logs
+
+- Game: `Documents\My Games\Skyrim Special Edition\SKSE\chim-gore.log`, next to the other SKSE logs. Recent lines are also sent to the server and shown on the plugin page.
+- Server: the Diagnostics section of the plugin page, which keeps the last 2000 entries.
 
 ## How it works
 
@@ -93,13 +102,14 @@ Both gore mods are optional, but with neither installed this add-on does nothing
                                               ◀ CHIM speaks with the follower's voice
 ```
 
-- **`CHIMGore.dll`** is an SKSE plugin built with CommonLibSSE-NG. It talks to the gore mods only through their public Papyrus functions and to CHIM only through `AIAgentFunctions`, the same API CHIM's own scripts use. It has no HTTP code and no settings for the server address.
-- **`ext/chim_gore/`** is a HerikaServer plugin with one hook (`prerequest.php`), a settings page and one table, `plugins.chim_gore_settings`. It changes only requests that carry the `[chim_gore …]` marker; every other request passes through untouched.
+- **`CHIMGore.dll`** is an SKSE plugin built with CommonLibSSE-NG. It talks to the gore mods only through their public Papyrus functions and to CHIM only through `AIAgentFunctions`, the same API CHIM's own scripts use. Every 30 s it also fetches its settings from `ext/chim_gore/api/config.php` and posts its status and new log lines to `api/status.php`. If the server is unreachable it falls back to the INI.
+- **`ext/chim_gore/`** is a HerikaServer plugin with one hook (`prerequest.php`), a settings page, two small API endpoints and two tables, `plugins.chim_gore_settings` and `plugins.chim_gore_log`. It changes only requests that carry the `[chim_gore …]` marker. It also notes CHIM's own `combatend` comments, so it does not talk over them. Every other request passes through untouched.
 - If the server part is missing, the follower still reacts, but without the chance/cooldown policy.
 - CHIM's own on/off switch is respected: when CHIM interaction is off, no reaction is generated.
 
 ## Compatibility notes
 
+- Followers are addressed by name when asking CHIM for a reaction. If two followers share the same name, CHIM may pick the other one.
 - Works alongside CHIM's normal *combat end* comments. If you find them too chatty together, lower CHIM's combat-comment chance or this add-on's chance.
 - Limb detection covers the node names from Dismembering Framework's official humanoid pack. Creature packs with other node names will still report heads, but not every limb.
 - Event text is generated in English. CHIM's LLM answers in your configured language.
@@ -126,17 +136,16 @@ To release, raise the version in `manifest.json`, `dwemer-package.json`, `Skyrim
 
 | Symptom | Check |
 |---|---|
-| Nothing happens | `Documents/My Games/Skyrim Special Edition/SKSE/CHIMGore.log` should list `Integrations: Next-Gen Decapitations=true …` and `Gore event (score …)` lines. |
-| Events logged but nobody talks | Server Plugins → CHIM Gore → Status. Is the chance or cooldown blocking? Is a follower within range? Is CHIM interaction on? Is the follower registered as a CHIM agent? |
-| "Could not reach CHIM" in the log | CHIM is not installed or not loaded. |
+| No `CHIM-gore: activated` after loading | The mod is not enabled, or SKSE/Address Library is missing. Check `chim-gore.log`. |
+| `activated, but no supported gore mod is active` | Neither gore mod is loaded, or both are unticked on the plugin page. |
+| `request failed (… not reachable)` | That gore mod's Papyrus script is missing or outdated. |
+| `request failed (CHIM not reachable)` | CHIM is not installed or not loaded. |
+| Events saved but nobody talks | Plugin page → Diagnostics. The server log says why a reaction was skipped (chance, cooldown, score, CHIM already commented). |
+| Plugin page says *no report yet* | The game cannot reach the server plugin. Set `[Server]` in `CHIMGore.ini` if CHIM uses a non-default address. |
 
 ## Feedback
 
-Please open an [issue](https://github.com/Marcius3d/chim_gore/issues), or post in the CHIM Discord, with:
-
-- your `CHIMGore.log`
-- your CHIM version
-- which gore mods you use
+Please open an [issue](https://github.com/Marcius3d/chim_gore/issues) or post in the CHIM Discord. Attach the file from **Plugin Page → Diagnostics → Create diagnostic file** and, if possible, `chim-gore.log`.
 
 ## Credits
 

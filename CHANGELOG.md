@@ -1,6 +1,17 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.2.0 (unreleased)
+
+- In-game messages. `CHIM-gore: activated (…)` is always shown after loading a save. In debug mode, `request sent / request failed (reason) / request successful` is shown for every check and every reaction request.
+- The plugin page now controls the game plugin: enable, debug mode, which gore mods to use, delays, range. The DLL fetches these settings from the server every 30 s; `CHIMGore.ini` is only a fallback.
+- Status panel showing whether the game plugin is connected, the detected mods with versions, counters and the last error.
+- Diagnostics: server and game log viewer, plus a **Create diagnostic file** button for bug reports. The game log is now `chim-gore.log`.
+- Limb nodes are read from the installed Dismembering Framework packs, so creature packs work too.
+- Head distance is sampled several times while the head is still rolling.
+- No comment when CHIM itself has just commented on the fight (configurable).
+- A Papyrus watchdog reports a failure instead of waiting forever.
+
+## 0.1.0
 
 - First version.
 - Detects decapitations (Next-Gen Decapitations, Dismembering Framework) and severed forearms, legs and tails (Dismembering Framework) caused by the player or followers.

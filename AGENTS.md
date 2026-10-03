@@ -17,9 +17,18 @@ This repository is the source of a CHIM add-on. It has two parts.
   - `DismemberingFramework.IsDismemberedNode(Actor, String)`
 
   NGD forms read from `Next-Gen Decapitations.esp`: keywords 0x800 and 0x801, activator 0x802 (linked refs to the body and head).
+- **Game ↔ server HTTP.** The DLL resolves the server like CHIM does (`CHIMGore.ini [Server]` → `AIAgent.ini` → `127.0.0.1:7135/discover` → `127.0.0.1:8081`).
+  - `GET ext/chim_gore/api/config.php` returns plain `key=value` lines. Keys are listed in `chimGoreGameKeys()`. Unknown keys must be ignored.
+  - `POST api/status.php` takes flat JSON plus `log_lines` (up to 300).
+  - Keep both sides in sync when adding a setting.
 - **Marker.** The reaction text starts with `[chim_gore score=N heads=N limbs=N events=N]`. `lib/chim_gore.php` parses it. Keep both sides in sync.
-- **Server hook.** Only `prerequest.php` is used. It runs after the NPC profile is loaded, so `$GLOBALS['HERIKA_NAME']` is the follower. Never give files in `lib/` a hook name (HerikaServer loads hook names recursively); `scripts/build_packages.py` enforces this.
-- **Database.** One table, `plugins.chim_gore_settings` (key/value). Migrations are append-only once released.
+- **Server hook.** Only `prerequest.php` is used, for `instruction` and `combatend` requests. It runs after the NPC profile is loaded, so `$GLOBALS['HERIKA_NAME']` is the follower. Never give files in `lib/` or `api/` a hook name (HerikaServer loads hook names recursively); `scripts/build_packages.py` enforces this.
+- **Database.** Two tables:
+  - `plugins.chim_gore_settings`: key/value.
+  - `plugins.chim_gore_log`: diagnostics, trimmed to 2000 rows.
+
+  Migrations are append-only once released.
+- **Notifications.** Use `RE::DebugNotification` with the `CHIM-gore: ` prefix, so HUD mods place them next to CHIM and NFF messages. Only `activated` is shown outside debug mode.
 
 ## Versioning
 
