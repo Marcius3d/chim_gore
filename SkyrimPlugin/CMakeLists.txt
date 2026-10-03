@@ -1,0 +1,26 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(CHIMGore VERSION 0.1.0 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+
+find_package(CommonLibSSE CONFIG REQUIRED)
+
+add_commonlibsse_plugin(${PROJECT_NAME}
+    NAME "CHIMGore"
+    AUTHOR "Marcius3d"
+    USE_ADDRESS_LIBRARY
+    SOURCES src/main.cpp
+)
+
+target_compile_definitions(${PROJECT_NAME}
+    PRIVATE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+)
+
+if (MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /W4 /permissive- /Zc:preprocessor /EHsc /bigobj /utf-8)
+endif ()
