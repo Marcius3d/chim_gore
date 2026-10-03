@@ -139,10 +139,17 @@ check('unknown key rejected', chimGoreSetValue('evil', 'x') === false);
 
 // info_gore events: appended to CHIM's death line, killer corrected from CHIM's line
 $GLOBALS['db']->deathRow = ['rowid' => 42, 'data' => '(Context location: Fort Greymoor)Sapphire has defeated Bandit Vanguard using weapon Iron Sword', 'people' => '|Sapphire|Ashe|Martin|'];
-$ev = ['info_gore', '1', '2', '[gore victim="Bandit Vanguard" killer="Martin"] Martin severed the Bandit Vanguard\'s left forearm.'];
+$ev = ['info_gore', '1', '2', '[gore victim="Bandit Vanguard" killer="Martin" src="death"] Martin severed the Bandit Vanguard\'s left forearm.'];
 check('gore event handled', chimGoreHandleGoreEvent($ev) === true);
 check('killer corrected from CHIM death line', $ev[3] === "Sapphire severed the Bandit Vanguard's left forearm.");
 check('death line updated', ($GLOBALS['db']->updates[0][1] ?? 0) === 42 && str_contains($GLOBALS['db']->updates[0][0], 'Sapphire severed'));
+$GLOBALS['db']->deathRow = ['rowid' => 43, 'data' => ' (Context location: Fort Greymoor outdoors ,Hold: Whiterun) Sofia has defeated Marauder Agent using weapon Steel Sword', 'people' => '|Ashe|'];
+$ev3 = ['info_gore', '1', '2', '[gore victim="Marauder Agent" killer="Ashe" src="hit"] Ashe severed the Marauder Agent\'s left forearm.'];
+chimGoreHandleGoreEvent($ev3);
+check('killer from a weapon hit is kept', str_starts_with($ev3[3], 'Ashe severed'));
+$ev4 = ['info_gore', '1', '2', '[gore victim="Marauder Agent" killer="Martin" src="death"] Martin severed the Marauder Agent\'s left forearm.'];
+chimGoreHandleGoreEvent($ev4);
+check('context prefix is not taken as a name', str_starts_with($ev4[3], 'Sofia severed'));
 $GLOBALS['db']->deathRow = null;
 $ev2 = ['info_gore', '1', '2', 'plain text without marker'];
 check('event without marker is left to CHIM', chimGoreHandleGoreEvent($ev2) === false && $ev2[3] === 'plain text without marker');

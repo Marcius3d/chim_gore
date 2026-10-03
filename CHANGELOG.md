@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Fix: the server could take the `(Context location: …)` part of CHIM's death line for the killer's name.
+- Fix: the killer seen by the game (the weapon hit that severed the limb) is no longer replaced with CHIM's guess. CHIM's name is used only when the game did not see the blow.
+- Wording: "… with Steel Sword in a power attack" instead of "with Steel Sword with a power attack".
+
 ## 0.3.0
 
 - Fix: kills by followers were credited to the player ("Martin severed …"). Skyrim's death event often names the player. CHIM Gore now trusts the last weapon hit, as CHIM does. As a safety net, the server also corrects the name from CHIM's own death line.

@@ -54,7 +54,7 @@ using namespace std::chrono_literals;
 
 namespace
 {
-    constexpr const char* kPluginVersion = "0.3.0";
+    constexpr const char* kPluginVersion = "0.3.1";
     constexpr const char* kNotifyPrefix = "CHIM-gore: ";
     constexpr const char* kNgdPlugin = "Next-Gen Decapitations.esp";
     constexpr const char* kDfPlugin = "Dismembering Framework.esm";
@@ -570,7 +570,7 @@ namespace
         const std::string& body, std::string* response, int timeoutMs = 3000)
     {
         bool ok = false;
-        HINTERNET session = WinHttpOpen(L"CHIMGore/0.3.0", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        HINTERNET session = WinHttpOpen(L"CHIMGore/0.3.1", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (!session) {
             return false;
         }
@@ -894,6 +894,7 @@ namespace
         std::string weaponName;
         bool killMove{false};
         bool powerAttack{false};
+        bool killerFromHit{false};
         bool decapitated{false};
         float headDistanceMeters{-1.0f};
         std::vector<std::string> limbs;
@@ -936,7 +937,7 @@ namespace
         if (e.killMove) {
             how += " in a finishing move";
         } else if (e.powerAttack) {
-            how += " with a power attack";
+            how += " in a power attack";
         }
 
         std::vector<std::string> parts;
@@ -1026,7 +1027,8 @@ namespace
                     Notify("request failed (CHIM did not accept the event)");
                 }
             },
-            std::format("[gore victim=\"{}\" killer=\"{}\"] {}", event.victimName, event.killerName, event.sentence),
+            std::format("[gore victim=\"{}\" killer=\"{}\" src=\"{}\"] {}", event.victimName, event.killerName,
+                event.killerFromHit ? "hit" : "death", event.sentence),
             std::string("info_gore"));
         if (!dispatched) {
             SetLastError("CHIM not reachable (AIAgentFunctions.logMessage)");
@@ -1574,12 +1576,14 @@ namespace
             }
             RE::TESObjectWEAP* hitWeapon = nullptr;
             bool powerAttack = false;
+            bool killerFromHit = false;
             if (auto hit = RecentHit(victim->GetFormID())) {
                 if (auto striker = hit->aggressor.get()) {
                     if (striker.get() != killer) {
                         logger::debug("Death event names {}, last hit was by {}", killer ? ActorName(killer) : "nobody", ActorName(striker.get()));
                     }
                     killer = striker.get();
+                    killerFromHit = true;
                 }
                 hitWeapon = RE::TESForm::LookupByID<RE::TESObjectWEAP>(hit->weapon);
                 powerAttack = hit->powerAttack;
@@ -1617,6 +1621,7 @@ namespace
                 }
             }
             base.powerAttack = powerAttack;
+            base.killerFromHit = killerFromHit;
             base.killMove = victim->IsInKillMove() || killer->IsInKillMove();
             logger::debug("{} killed {}", base.killerName, base.victimName);
 

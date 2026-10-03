@@ -10,7 +10,7 @@ if (defined('CHIM_GORE_VERSION')) {
     return;
 }
 
-define('CHIM_GORE_VERSION', '0.3.0');
+define('CHIM_GORE_VERSION', '0.3.1');
 define('CHIM_GORE_TABLE', 'plugins.chim_gore_settings');
 define('CHIM_GORE_LOG_TABLE', 'plugins.chim_gore_log');
 define('CHIM_GORE_LOG_KEEP', 2000);
@@ -431,11 +431,11 @@ define('CHIM_GORE_EVENT_MARKER_REGEX', '/^\s*\[gore([^\]]*)\]\s*/i');
 
 function chimGoreParseEventMarker(string $data): array
 {
-    $values = ['victim' => '', 'killer' => ''];
+    $values = ['victim' => '', 'killer' => '', 'src' => ''];
     if (!preg_match(CHIM_GORE_EVENT_MARKER_REGEX, $data, $m)) {
         return [$values, $data];
     }
-    if (preg_match_all('/(victim|killer)="([^"]*)"/i', $m[1], $pairs, PREG_SET_ORDER)) {
+    if (preg_match_all('/(victim|killer|src)="([^"]*)"/i', $m[1], $pairs, PREG_SET_ORDER)) {
         foreach ($pairs as $pair) {
             $values[strtolower($pair[1])] = $pair[2];
         }
@@ -467,8 +467,11 @@ function chimGoreHandleGoreEvent(array &$gameRequest): bool
         $row = null;
     }
     if ($row && !empty($row['data'])) {
-        // CHIM's line: "(Context ...)Sofia has defeated Thug Spellsword using weapon Steel Sword"
-        if (preg_match('/^(?:\([^)]*\))?\s*(.+?) has (?:defeated|killed) /', (string)$row['data'], $km)) {
+        // CHIM's line: "(Context ...)Sofia has defeated Thug Spellsword using weapon Steel Sword".
+        // Only used when the game could not see the killing blow (src != hit): the weapon hit that
+        // severed the limb is more reliable than CHIM's own guess.
+        $line = trim(preg_replace('/\([^)]*\)/', '', (string)$row['data']));
+        if ($marker['src'] !== 'hit' && preg_match('/^([^():]{1,40}?) has (?:defeated|killed) /', $line, $km)) {
             $chimKiller = trim($km[1]);
             if ($chimKiller !== '' && $marker['killer'] !== '' && strcasecmp($chimKiller, $marker['killer']) !== 0
                 && stripos($chimKiller, $marker['victim']) === false && str_starts_with($sentence, $marker['killer'])) {
