@@ -29,6 +29,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <random>
 #include <regex>
 #include <set>
@@ -53,7 +54,7 @@ using namespace std::chrono_literals;
 
 namespace
 {
-    constexpr const char* kPluginVersion = "0.2.2";
+    constexpr const char* kPluginVersion = "0.3.0";
     constexpr const char* kNotifyPrefix = "CHIM-gore: ";
     constexpr const char* kNgdPlugin = "Next-Gen Decapitations.esp";
     constexpr const char* kDfPlugin = "Dismembering Framework.esm";
@@ -569,7 +570,7 @@ namespace
         const std::string& body, std::string* response, int timeoutMs = 3000)
     {
         bool ok = false;
-        HINTERNET session = WinHttpOpen(L"CHIMGore/0.2.2", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        HINTERNET session = WinHttpOpen(L"CHIMGore/0.3.0", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (!session) {
             return false;
         }
@@ -892,6 +893,7 @@ namespace
         bool victimUnique{false};
         std::string weaponName;
         bool killMove{false};
+        bool powerAttack{false};
         bool decapitated{false};
         float headDistanceMeters{-1.0f};
         std::vector<std::string> limbs;
@@ -933,6 +935,8 @@ namespace
         }
         if (e.killMove) {
             how += " in a finishing move";
+        } else if (e.powerAttack) {
+            how += " with a power attack";
         }
 
         std::vector<std::string> parts;
@@ -1022,7 +1026,8 @@ namespace
                     Notify("request failed (CHIM did not accept the event)");
                 }
             },
-            std::string(event.sentence), std::string("info_gore"));
+            std::format("[gore victim=\"{}\" killer=\"{}\"] {}", event.victimName, event.killerName, event.sentence),
+            std::string("info_gore"));
         if (!dispatched) {
             SetLastError("CHIM not reachable (AIAgentFunctions.logMessage)");
             Notify("request failed (CHIM not reachable)");
@@ -1492,6 +1497,62 @@ namespace
         return !g_seenVictims.emplace(id, now).second;
     }
 
+    // The death event often names the player as the killer even when a follower struck the blow.
+    // Like CHIM, we trust the last hit instead.
+    struct LastHit
+    {
+        RE::ActorHandle aggressor;
+        RE::FormID weapon{0};
+        bool powerAttack{false};
+        std::chrono::steady_clock::time_point when;
+    };
+
+    std::mutex g_hitMutex;
+    std::unordered_map<RE::FormID, LastHit> g_lastHits;
+
+    class HitSink : public RE::BSTEventSink<RE::TESHitEvent>
+    {
+    public:
+        static HitSink* Get()
+        {
+            static HitSink instance;
+            return &instance;
+        }
+
+        RE::BSEventNotifyControl ProcessEvent(const RE::TESHitEvent* a_event, RE::BSTEventSource<RE::TESHitEvent>*) override
+        {
+            if (!a_event || !g_settings.enabled || !a_event->target || !a_event->cause) {
+                return RE::BSEventNotifyControl::kContinue;
+            }
+            auto aggressor = a_event->cause->As<RE::Actor>();
+            auto target = a_event->target->As<RE::Actor>();
+            if (!aggressor || !target || aggressor == target) {
+                return RE::BSEventNotifyControl::kContinue;
+            }
+            auto weapon = RE::TESForm::LookupByID<RE::TESObjectWEAP>(a_event->source);
+            if (!weapon) {
+                return RE::BSEventNotifyControl::kContinue;  // spells, effects: not a cutting blow
+            }
+            std::lock_guard lock(g_hitMutex);
+            if (g_lastHits.size() > 512) {
+                g_lastHits.clear();
+            }
+            g_lastHits[target->GetFormID()] = { aggressor->GetHandle(), weapon->GetFormID(),
+                a_event->flags.any(RE::TESHitEvent::Flag::kPowerAttack), std::chrono::steady_clock::now() };
+            return RE::BSEventNotifyControl::kContinue;
+        }
+    };
+
+    std::optional<LastHit> RecentHit(RE::FormID target)
+    {
+        std::lock_guard lock(g_hitMutex);
+        auto it = g_lastHits.find(target);
+        if (it == g_lastHits.end() || std::chrono::steady_clock::now() - it->second.when > 4s) {
+            return std::nullopt;
+        }
+        return it->second;
+    }
+
     class DeathSink : public RE::BSTEventSink<RE::TESDeathEvent>
     {
     public:
@@ -1508,7 +1569,22 @@ namespace
             }
             auto victim = a_event->actorDying ? a_event->actorDying->As<RE::Actor>() : nullptr;
             auto killer = a_event->actorKiller ? a_event->actorKiller->As<RE::Actor>() : nullptr;
-            if (!victim || !killer || victim->IsPlayerRef() || victim == killer) {
+            if (!victim || victim->IsPlayerRef()) {
+                return RE::BSEventNotifyControl::kContinue;
+            }
+            RE::TESObjectWEAP* hitWeapon = nullptr;
+            bool powerAttack = false;
+            if (auto hit = RecentHit(victim->GetFormID())) {
+                if (auto striker = hit->aggressor.get()) {
+                    if (striker.get() != killer) {
+                        logger::debug("Death event names {}, last hit was by {}", killer ? ActorName(killer) : "nobody", ActorName(striker.get()));
+                    }
+                    killer = striker.get();
+                }
+                hitWeapon = RE::TESForm::LookupByID<RE::TESObjectWEAP>(hit->weapon);
+                powerAttack = hit->powerAttack;
+            }
+            if (!killer || victim == killer) {
                 return RE::BSEventNotifyControl::kContinue;
             }
             const bool killerIsPlayer = killer->IsPlayerRef();
@@ -1528,14 +1604,19 @@ namespace
             if (auto npc = victim->GetActorBase()) {
                 base.victimUnique = npc->IsUnique();
             }
-            if (auto weapon = killer->GetEquippedObject(false)) {
-                if (auto w = weapon->As<RE::TESObjectWEAP>()) {
-                    const char* name = w->GetName();
-                    if (name && name[0] != '\0') {
-                        base.weaponName = name;
-                    }
+            RE::TESObjectWEAP* w = hitWeapon;
+            if (!w) {
+                if (auto weapon = killer->GetEquippedObject(false)) {
+                    w = weapon->As<RE::TESObjectWEAP>();
                 }
             }
+            if (w) {
+                const char* name = w->GetName();
+                if (name && name[0] != '\0' && !w->IsHandToHandMelee()) {
+                    base.weaponName = name;
+                }
+            }
+            base.powerAttack = powerAttack;
             base.killMove = victim->IsInKillMove() || killer->IsInKillMove();
             logger::debug("{} killed {}", base.killerName, base.victimName);
 
@@ -1559,6 +1640,10 @@ namespace
         {
             std::lock_guard lock(g_seenMutex);
             g_seenVictims.clear();
+        }
+        {
+            std::lock_guard lock(g_hitMutex);
+            g_lastHits.clear();
         }
     }
 
@@ -1585,6 +1670,7 @@ namespace
             DetectIntegrations();
             if (auto holder = RE::ScriptEventSourceHolder::GetSingleton()) {
                 holder->AddEventSink<RE::TESDeathEvent>(DeathSink::Get());
+                holder->AddEventSink<RE::TESHitEvent>(HitSink::Get());
             }
             Scheduler::Get().Start();
             NetWorker::Get().Start();
