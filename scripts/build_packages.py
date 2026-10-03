@@ -131,9 +131,10 @@ def main() -> int:
             ("SKSE/Plugins/CHIMGore.ini", ini.read_bytes()),
             (f"CHIM/server-plugins/{PLUGIN_NAME}/{version}.dwpkg", dwpkg),
         ]
-        name = f"CHIM-Gore-{version}.zip"
-        (DIST / name).write_bytes(zip_bytes(mod))
-        print(f"  dist/{name}")
+        archive = zip_bytes(mod)
+        for name in (f"CHIM-Gore-{version}.zip", "CHIM-Gore.zip"):  # versioned + stable "latest" name
+            (DIST / name).write_bytes(archive)
+            print(f"  dist/{name}")
     return 0
 
 
