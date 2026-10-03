@@ -53,7 +53,7 @@ using namespace std::chrono_literals;
 
 namespace
 {
-    constexpr const char* kPluginVersion = "0.2.0";
+    constexpr const char* kPluginVersion = "0.2.1";
     constexpr const char* kNotifyPrefix = "CHIM-gore: ";
     constexpr const char* kNgdPlugin = "Next-Gen Decapitations.esp";
     constexpr const char* kDfPlugin = "Dismembering Framework.esm";
@@ -466,14 +466,26 @@ namespace
         logger::info("Dismembering Framework: {} limb node(s) to check", g_mods.dfNodes.size());
     }
 
+    // Regular and light (ESL-flagged) plugins live in separate lists; check both.
+    bool IsPluginLoaded(RE::TESDataHandler* data, const char* name)
+    {
+        return data->LookupLoadedModByName(name) != nullptr || data->LookupLoadedLightModByName(name) != nullptr;
+    }
+
     void DetectIntegrations()
     {
         auto data = RE::TESDataHandler::GetSingleton();
         if (!data) {
             return;
         }
-        g_mods.ngdLoaded = data->LookupLoadedModByName(kNgdPlugin) != nullptr;
-        g_mods.dfLoaded = data->LookupLoadedModByName(kDfPlugin) != nullptr;
+        // The Papyrus API comes from the SKSE DLLs, so a loaded DLL also counts.
+        const bool ngdPlugin = IsPluginLoaded(data, kNgdPlugin);
+        const bool ngdDll = GetModuleHandleA("NextGenDecapitations.dll") != nullptr;
+        const bool dfPlugin = IsPluginLoaded(data, kDfPlugin);
+        const bool dfDll = GetModuleHandleA("DismemberingFramework.dll") != nullptr;
+        logger::info("Detection: {} plugin={} dll={}; {} plugin={} dll={}", kNgdPlugin, ngdPlugin, ngdDll, kDfPlugin, dfPlugin, dfDll);
+        g_mods.ngdLoaded = ngdPlugin || ngdDll;
+        g_mods.dfLoaded = dfPlugin || dfDll;
         if (g_mods.ngdLoaded) {
             g_mods.ngdActorKeyword = data->LookupForm<RE::BGSKeyword>(0x800, kNgdPlugin);
             g_mods.ngdHeadKeyword = data->LookupForm<RE::BGSKeyword>(0x801, kNgdPlugin);
@@ -544,7 +556,7 @@ namespace
         const std::string& body, std::string* response, int timeoutMs = 3000)
     {
         bool ok = false;
-        HINTERNET session = WinHttpOpen(L"CHIMGore/0.2", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        HINTERNET session = WinHttpOpen(L"CHIMGore/0.2.1", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (!session) {
             return false;
         }
