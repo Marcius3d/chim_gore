@@ -53,7 +53,7 @@ using namespace std::chrono_literals;
 
 namespace
 {
-    constexpr const char* kPluginVersion = "0.2.1";
+    constexpr const char* kPluginVersion = "0.2.2";
     constexpr const char* kNotifyPrefix = "CHIM-gore: ";
     constexpr const char* kNgdPlugin = "Next-Gen Decapitations.esp";
     constexpr const char* kDfPlugin = "Dismembering Framework.esm";
@@ -541,6 +541,19 @@ namespace
         return out;
     }
 
+    std::string UrlEncode(const std::string& in)
+    {
+        std::string out;
+        for (unsigned char c : in) {
+            if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+                out += static_cast<char>(c);
+            } else {
+                out += std::format("%{:02X}", c);
+            }
+        }
+        return out;
+    }
+
     std::wstring Widen(const std::string& s)
     {
         if (s.empty()) {
@@ -556,7 +569,7 @@ namespace
         const std::string& body, std::string* response, int timeoutMs = 3000)
     {
         bool ok = false;
-        HINTERNET session = WinHttpOpen(L"CHIMGore/0.2.1", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        HINTERNET session = WinHttpOpen(L"CHIMGore/0.2.2", WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (!session) {
             return false;
         }
@@ -847,6 +860,26 @@ namespace
         std::atomic<bool> _wake{false};
     };
 
+    // Some NPCs return an empty display name; fall back to the reference and base names.
+    std::string ActorName(RE::Actor* actor)
+    {
+        if (!actor) {
+            return "someone";
+        }
+        if (const char* n = actor->GetDisplayFullName(); n && n[0] != '\0') {
+            return n;
+        }
+        if (const char* n = actor->GetName(); n && n[0] != '\0') {
+            return n;
+        }
+        if (auto base = actor->GetActorBase()) {
+            if (const char* n = base->GetName(); n && n[0] != '\0') {
+                return n;
+            }
+        }
+        return actor->IsPlayerRef() ? "the player" : "someone";
+    }
+
     // ------------------------------------------------------------------------------------
     // Gore events
     // ------------------------------------------------------------------------------------
@@ -1026,7 +1059,7 @@ namespace
         for (auto* e : sorted) {
             auto killer = e->killer.get();
             if (killer && IsUsableFollower(killer.get()) && used.insert(killer->GetFormID()).second) {
-                names.emplace_back(killer->GetDisplayFullName());
+                names.emplace_back(ActorName(killer.get()));
             }
         }
 
@@ -1043,7 +1076,7 @@ namespace
         std::sort(others.begin(), others.end(), [](auto& a, auto& b) { return a.first < b.first; });
         for (auto& [distance, actor] : others) {
             if (used.insert(actor->GetFormID()).second) {
-                names.emplace_back(actor->GetDisplayFullName());
+                names.emplace_back(ActorName(actor));
             }
         }
 
@@ -1096,7 +1129,7 @@ namespace
                 if (code == 1) {
                     ++g_statReactions;
                     logger::info("CHIM queued the reaction for {}", name);
-                    Notify("reaction request successful (the server decides if it is spoken)");
+                    Notify(std::format("reaction request successful ({})", name));
                     return;
                 }
                 logger::info("CHIM did not queue the reaction for {} (code {}), trying next", name, code);
@@ -1134,7 +1167,40 @@ namespace
             Notify("fight over, no follower nearby to react");
             return;
         }
-        TryReflect(candidates, 0, BuildReflectMessage(std::move(events)));
+        int best = 0;
+        for (auto& e : events) {
+            best = std::max(best, e.score);
+        }
+        auto message = BuildReflectMessage(std::move(events));
+        const std::string first = candidates->front();
+        if (!g_serverReachable.load()) {
+            Notify("server plugin not reachable, asking CHIM directly");
+            TryReflect(candidates, 0, std::move(message));
+            return;
+        }
+        // Ask the server first so debug mode shows the real outcome (chance, cooldown, ...).
+        std::thread([candidates, message = std::move(message), best, first]() mutable {
+            std::string answer;
+            const bool ok = HttpRequest(g_server.host, g_server.port, "GET",
+                std::format("{}/api/decide.php?score={}&npc={}", g_server.basePath, best, UrlEncode(first)), {}, &answer);
+            answer = Trim(answer);
+            if (auto tasks = SKSE::GetTaskInterface()) {
+                tasks->AddTask([candidates, message = std::move(message), ok, answer]() mutable {
+                    if (!ok || answer.empty()) {
+                        logger::warn("Reaction decision request failed; asking CHIM directly");
+                        TryReflect(candidates, 0, std::move(message));
+                    } else if (answer == "allow") {
+                        logger::info("Server allowed the reaction");
+                        TryReflect(candidates, 0, std::move(message));
+                    } else {
+                        const auto bar = answer.find('|');
+                        const auto reason = bar == std::string::npos ? answer : answer.substr(bar + 1);
+                        logger::info("Server skipped the reaction: {}", reason);
+                        Notify(std::format("reaction skipped ({})", reason));
+                    }
+                });
+            }
+        }).detach();
     }
 
     void WatchCombat(std::uint64_t generation);
@@ -1456,9 +1522,9 @@ namespace
 
             GoreEvent base;
             base.killer = killer->GetHandle();
-            base.killerName = killer->GetDisplayFullName();
+            base.killerName = ActorName(killer);
             base.killerIsPlayer = killerIsPlayer;
-            base.victimName = victim->GetDisplayFullName();
+            base.victimName = ActorName(victim);
             if (auto npc = victim->GetActorBase()) {
                 base.victimUnique = npc->IsUnique();
             }
