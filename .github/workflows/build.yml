@@ -1,0 +1,77 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  server:
+    name: Server checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP lint
+        run: for f in *.php lib/*.php tests/*.php; do php -l "$f"; done
+      - name: Policy tests
+        run: php tests/server_policy_test.php
+      - name: Version check
+        run: python3 scripts/build_packages.py --check-only
+
+  build:
+    name: Build DLL and packages
+    needs: server
+    runs-on: windows-2022
+    env:
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg-cache
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use the runner's vcpkg
+        shell: pwsh
+        run: |
+          "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Append
+          New-Item -ItemType Directory -Force -Path "$env:VCPKG_DEFAULT_BINARY_CACHE" | Out-Null
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}\vcpkg-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('SkyrimPlugin/vcpkg.json', 'SkyrimPlugin/vcpkg-configuration.json') }}
+          restore-keys: vcpkg-${{ runner.os }}-
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure
+        working-directory: SkyrimPlugin
+        run: cmake --preset release
+
+      - name: Build
+        working-directory: SkyrimPlugin
+        run: cmake --build --preset release
+
+      - name: Package
+        shell: pwsh
+        run: python scripts/build_packages.py --dll SkyrimPlugin/build/release/CHIMGore.dll
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: CHIM-Gore-build
+          path: |
+            dist/*
+            SkyrimPlugin/build/release/CHIMGore.pdb
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
