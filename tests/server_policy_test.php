@@ -28,8 +28,13 @@ final class ChimGoreFakeDb
         return [];
     }
 
+    public array $events = [];
+
     public function fetchAll($q)
     {
+        if (str_contains($q, 'FROM eventlog')) {
+            return array_map(fn($d) => ['data' => $d], array_reverse($this->events));
+        }
         if (str_contains($q, 'chim_gore_log')) {
             $rows = $this->log;
             if (preg_match("/source = '(\w+)'/", $q, $m)) {
@@ -70,7 +75,7 @@ check('marker parsed', $parsed !== null && $parsed['values']['score'] === 9 && $
 check('location prefix kept', $parsed['prefix'] === '(Context location: Bleak Falls Barrow)');
 check('details extracted', str_starts_with($parsed['details'], 'Serana cut off'));
 check('foreign instruction ignored', chimGoreHandleRequest(['instruction', '1', '2', 'Go to Whiterun']) === null);
-check('other request types ignored', chimGoreHandleRequest(['inputtext', '1', '2', $text]) === null);
+check('other request types ignored', chimGoreHandleRequest(['inputtext', '1', '2', $text]) === null && chimGoreHandleRequest(['combatend', '1', '2', 'x']) === null);
 
 // Policy
 chimGoreSetValue('chance', '100');
@@ -81,10 +86,31 @@ check('marker removed', !str_contains($first['data'], '[chim_gore'));
 check('cooldown blocks second', chimGoreHandleRequest($request)['allow'] === false);
 
 chimGoreSetValue('last_reflect_ts', '0');
-check('CHIM combatend is recorded and passes through', chimGoreHandleRequest(['combatend', '1', '2', 'x']) === null);
+chimGoreNoteChimCombatComment('combatend');
 check('skip right after CHIM commented the fight', chimGoreHandleRequest($request)['allow'] === false);
 chimGoreSetValue('skip_after_chim_combat_seconds', '0');
 check('overlap check can be disabled', chimGoreHandleRequest($request)['allow'] === true);
+
+// Decide-first flow used by the game plugin
+chimGoreSetValue('last_reflect_ts', '0');
+[$ok, $why] = chimGoreDecideForGame(9, 'Serana');
+check('decide endpoint allows', $ok === true && $why === 'ok');
+$viaToken = chimGoreHandleRequest($request);
+check('token request is not rolled again', $viaToken['allow'] === true);
+check('token is consumed', chimGoreGetSettings()['reflect_token_ts'] === '0');
+[$ok, $why] = chimGoreDecideForGame(9, 'Serana');
+check('decide endpoint reports cooldown', $ok === false && $why === 'cooldown' && chimGoreReasonText($why) === 'cooldown');
+
+// Enriching CHIM's own combat comment
+$GLOBALS['db']->events = ['(Context location: Fort)Sofia cut off the bandit\'s head; the severed head landed about 3 meters away.'];
+$GLOBALS['PROMPTS'] = ['combatend' => ['cue' => ['(Sofia comments about foes defeated)']]];
+chimGoreEnrichCombatPrompt('combatend');
+check('combat comment gets gore details', str_contains($GLOBALS['PROMPTS']['combatend']['cue'][0], 'Sofia cut off the bandit') && !str_contains($GLOBALS['PROMPTS']['combatend']['cue'][0], 'Context location'));
+chimGoreSetValue('enrich_chim_combat', '0');
+$GLOBALS['PROMPTS'] = ['combatend' => ['cue' => ['x']]];
+chimGoreEnrichCombatPrompt('combatend');
+check('enrichment can be turned off', $GLOBALS['PROMPTS']['combatend']['cue'][0] === 'x');
+chimGoreSetValue('enrich_chim_combat', '1');
 
 chimGoreSetValue('last_reflect_ts', '0');
 chimGoreSetValue('min_score', '10');
