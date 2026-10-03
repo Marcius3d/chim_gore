@@ -1,7 +1,7 @@
 {
   "schema_version": 4,
   "name": "chim_gore",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CHIM Gore server plugin.",
   "server": {
     "mutable_paths": []

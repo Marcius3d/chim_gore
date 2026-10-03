@@ -1,6 +1,11 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.1
+
+- Fix: Next-Gen Decapitations and Dismembering Framework were reported as "not installed" when their plugins are ESL-flagged (light), as in Nolvus. Light plugins are now checked too, and a loaded SKSE DLL of either mod also counts as installed.
+- The log now records how each mod was detected (plugin and DLL).
+
+## 0.2.0
 
 - In-game messages. `CHIM-gore: activated (…)` is always shown after loading a save. In debug mode, `request sent / request failed (reason) / request successful` is shown for every check and every reaction request.
 - The plugin page now controls the game plugin: enable, debug mode, which gore mods to use, delays, range. The DLL fetches these settings from the server every 30 s; `CHIMGore.ini` is only a fallback.
