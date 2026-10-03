@@ -28,7 +28,7 @@ DIST = ROOT / "dist"
 PLUGIN_NAME = "chim_gore"
 
 # Files that make up the server extension (installed into HerikaServer/ext/chim_gore/).
-SERVER_FILES = ["manifest.json", "README.md", "AGENTS.md", "LICENSE", "CHANGELOG.md", "index.php", "prerequest.php"]
+SERVER_FILES = ["manifest.json", "README.md", "AGENTS.md", "LICENSE", "CHANGELOG.md", "index.php", "prerequest.php", "prompts.php", "postrequest.php"]
 SERVER_DIRS = ["api", "lib", "migrations"]
 HOOK_NAMES = {
     "globals.php", "preprocessing.php", "prerequest.php", "context_pre.php", "context.php",
