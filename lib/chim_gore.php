@@ -10,7 +10,7 @@ if (defined('CHIM_GORE_VERSION')) {
     return;
 }
 
-define('CHIM_GORE_VERSION', '0.2.2');
+define('CHIM_GORE_VERSION', '0.3.0');
 define('CHIM_GORE_TABLE', 'plugins.chim_gore_settings');
 define('CHIM_GORE_LOG_TABLE', 'plugins.chim_gore_log');
 define('CHIM_GORE_LOG_KEEP', 2000);
@@ -59,15 +59,18 @@ function chimGoreDefaults(): array
         'min_score' => '4',            // 6 = any decapitation, 2 = one limb
         'skip_after_chim_combat_seconds' => '45', // skip if CHIM itself just commented the fight
         'enrich_chim_combat' => '1',   // add this fight's gore to CHIM's own combat-end comment
-        'instruction' => '{NPC} briefly reacts to the most gruesome moment of the fight that just ended, '
-            . 'in their own voice and personality: shocked, amused, disgusted or proud, whatever fits them. '
-            . 'One or two short sentences. Only mention injuries listed here. What happened: {DETAILS}',
+        'instruction' => '{NPC} reacts out loud to the most gruesome moment of the fight that just ended. '
+            . 'If {NPC} did the cutting, they talk about their own blow in first person (proud, shocked, joking or grim, whatever fits them) '
+            . 'and may say it to a nearby companion; otherwise they comment on what they saw. One or two short sentences, in character. '
+            . 'Only mention injuries listed here. What happened: {DETAILS}',
+        'enrich_death_line' => '1',    // append the gore to CHIM's own death event line
         // State and counters
         'last_reflect_ts' => '0',
         'last_chim_combat_ts' => '0',
         'stat_requests' => '0',
         'stat_spoken' => '0',
         'stat_enriched' => '0',
+        'stat_death_lines' => '0',
         'reflect_token_ts' => '0',
         'game_status' => '',
         'game_status_ts' => '0',
@@ -117,6 +120,9 @@ function chimGoreGetSettings(): array
         }
     } catch (Throwable $e) {
         // Defaults keep the plugin usable while the table is unavailable.
+    }
+    if (trim($settings['instruction']) === '') {
+        $settings['instruction'] = chimGoreDefaults()['instruction'];
     }
     return $settings;
 }
@@ -418,6 +424,79 @@ function chimGoreHandleRequest(array $gameRequest): ?array
     }
     chimGoreLog('info', "Reaction sent to CHIM for {$npc}: {$parsed['details']}");
     return ['allow' => true, 'data' => $parsed['prefix'] . chimGoreBuildInstruction($settings, $npc, $parsed['details'])];
+}
+
+/** Marker CHIMGore.dll puts in front of each info_gore event: [gore victim=Name killer=Name] */
+define('CHIM_GORE_EVENT_MARKER_REGEX', '/^\s*\[gore([^\]]*)\]\s*/i');
+
+function chimGoreParseEventMarker(string $data): array
+{
+    $values = ['victim' => '', 'killer' => ''];
+    if (!preg_match(CHIM_GORE_EVENT_MARKER_REGEX, $data, $m)) {
+        return [$values, $data];
+    }
+    if (preg_match_all('/(victim|killer)="([^"]*)"/i', $m[1], $pairs, PREG_SET_ORDER)) {
+        foreach ($pairs as $pair) {
+            $values[strtolower($pair[1])] = $pair[2];
+        }
+    }
+    return [$values, substr($data, strlen($m[0]))];
+}
+
+/**
+ * prerequest.php for "info_gore": append the gore to CHIM's own death line for that victim
+ * (correcting the killer if CHIM knows better) and store the event so everyone nearby sees it.
+ * Returns true when the request has been handled completely.
+ */
+function chimGoreHandleGoreEvent(array &$gameRequest): bool
+{
+    [$marker, $sentence] = chimGoreParseEventMarker((string)($gameRequest[3] ?? ''));
+    $gameRequest[3] = $sentence;
+    $db = chimGoreDb();
+    $settings = chimGoreGetSettings();
+    if (!$db || $marker['victim'] === '') {
+        return false;
+    }
+    $row = null;
+    try {
+        $row = $db->fetchOne(
+            "SELECT rowid, data, people FROM eventlog WHERE type = 'death' AND localts > $1 AND data LIKE $2 ORDER BY rowid DESC LIMIT 1",
+            [time() - 90, '%' . $marker['victim'] . '%']
+        );
+    } catch (Throwable $e) {
+        $row = null;
+    }
+    if ($row && !empty($row['data'])) {
+        // CHIM's line: "(Context ...)Sofia has defeated Thug Spellsword using weapon Steel Sword"
+        if (preg_match('/^(?:\([^)]*\))?\s*(.+?) has (?:defeated|killed) /', (string)$row['data'], $km)) {
+            $chimKiller = trim($km[1]);
+            if ($chimKiller !== '' && $marker['killer'] !== '' && strcasecmp($chimKiller, $marker['killer']) !== 0
+                && stripos($chimKiller, $marker['victim']) === false && str_starts_with($sentence, $marker['killer'])) {
+                $sentence = $chimKiller . substr($sentence, strlen($marker['killer']));
+                $gameRequest[3] = $sentence;
+                chimGoreLog('info', "Killer corrected from {$marker['killer']} to {$chimKiller} (CHIM's death line)");
+            }
+        }
+        if ($settings['enrich_death_line'] === '1') {
+            try {
+                $db->fetchOne('UPDATE eventlog SET data = data || $1 WHERE rowid = $2 RETURNING rowid', [' — ' . $sentence, (int)$row['rowid']]);
+                chimGoreIncrement('stat_death_lines');
+                return true;
+            } catch (Throwable $e) {
+                // fall through: store as a separate event
+            }
+        }
+    }
+    // Separate event, visible to everyone in range (CHIM would otherwise scope it to the names in the text).
+    if (function_exists('logEvent')) {
+        $people = (string)($row['people'] ?? '');
+        if ($people === '' && function_exists('DataBeingsInRange')) {
+            $people = (string)DataBeingsInRange();
+        }
+        logEvent($gameRequest, $people);
+        return true;
+    }
+    return false;
 }
 
 /** Gory events of the last fight, newest first (from CHIM's event log). */
