@@ -1,6 +1,6 @@
 {
   "name": "chim-gore",
-  "version-string": "0.2.2",
+  "version-string": "0.3.0",
   "dependencies": [
     "commonlibsse-ng"
   ]
