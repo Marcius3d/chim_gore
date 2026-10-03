@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(CHIMGore VERSION 0.1.0 LANGUAGES CXX)
+project(CHIMGore VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,6 +16,8 @@ add_commonlibsse_plugin(${PROJECT_NAME}
 )
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE src/PCH.h)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE winhttp version)
 
 target_compile_definitions(${PROJECT_NAME}
     PRIVATE
