@@ -114,7 +114,8 @@ jobs:
             |---|---|
             | `CHIM-Gore-${{ steps.version.outputs.version }}.zip` / `CHIM-Gore.zip` | **The mod for MO2/Vortex** (DLL, INI and the embedded server package) |
             | `chim_gore-${{ steps.version.outputs.version }}.dwpkg` | Server package only (CHIM installs it automatically) |
-            | `chim_gore.tar.gz` | Server files for the CHIM *Server Plugins* update button |
+            | `chim-plugin.tar.gz` | Server files for CHIM's *Plugin Manager* (installs into `ext/chim_gore`) |
+            | `chim_gore.tar.gz` | Server files for older CHIM versions (*Server Plugins* update button) |
             | Source code | Not needed to play |
 
             What changed: see [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md).

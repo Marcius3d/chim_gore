@@ -8,7 +8,7 @@ Without it, CHIM only records *"Serana killed Bandit"*. With it, CHIM learns *"S
 
 > "Did you see that? His head went halfway across the room. I may have overdone it."
 
-> **Status: 0.3.3, beta.** Tested in game on Skyrim SE 1.5.97 (Nolvus) with NGD 1.2.0 and DF 1.0.6: decapitations and severed limbs are credited to the right follower, saved in CHIM memory, and a follower reacts after the fight. Please report results from other setups (see [Feedback](#feedback)).
+> **Status: 0.3.4, beta.** Tested in game on Skyrim SE 1.5.97 (Nolvus) with NGD 1.2.0 and DF 1.0.6: decapitations and severed limbs are credited to the right follower, saved in CHIM memory, and a follower reacts after the fight. Please report results from other setups (see [Feedback](#feedback)).
 
 
 ## ⬇ Download
@@ -66,7 +66,9 @@ Both gore mods are optional, but with neither installed this add-on does nothing
 4. A few seconds after the save loads you should see `CHIM-gore: activated (…)`.
 5. Optional: open the CHIM web UI → **Server Plugins** → *CHIM Gore* → **Plugin Page** to change settings.
 
-**Updating:** install the new zip over the old one. The server part updates on the next game start, or via the **Update** button in Server Plugins.
+The server part can also be installed or updated from CHIM's **Plugin Manager**, where CHIM Gore is listed (GitHub topic `chim-plugin`). The game part still comes from the zip above, because the server cannot install `CHIMGore.dll`.
+
+**Updating:** install the new zip over the old one. The server part updates on the next game start, or via the **Update** button in Plugin Manager / Server Plugins.
 
 **Uninstalling:** remove the mod. To also remove the server part, delete it in Server Plugins.
 

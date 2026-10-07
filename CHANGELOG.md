@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- CHIM's **Plugin Manager** can now list and install the server part: the repository carries the `chim-plugin` topic and every release has a `chim-plugin.tar.gz` asset. The MO2/Vortex zip is still needed for the game part (`CHIMGore.dll`).
+- First release that contains the plugin page defaults and the **Restore all defaults** button listed under 0.3.3 (they missed the 0.3.3 build).
+
 ## 0.3.3
 
 - Summoned and raised creatures (atronachs, spectral helpers, thralls, summoned Dremora) are ignored completely: their kills are not tracked, their deaths are not checked, and they are never picked to react.

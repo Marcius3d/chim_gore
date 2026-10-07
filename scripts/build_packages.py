@@ -3,7 +3,8 @@
 
 Outputs (in dist/):
   chim_gore-<version>.dwpkg   server package (schema 4) that CHIM installs automatically
-  chim_gore.tar.gz            server archive for the Server Plugins "Update" button
+  chim_gore.tar.gz            server archive for the Server Plugins "Update" button (legacy manifest channel)
+  chim-plugin.tar.gz          server files at the archive root, for CHIM Plugin Manager (GitHub topic chim-plugin)
   CHIM-Gore-<version>.zip     MO2/Vortex mod archive (DLL + INI + embedded .dwpkg)
 
 Usage:
@@ -85,11 +86,11 @@ def build_dwpkg(version: str) -> bytes:
     return zip_bytes(entries)
 
 
-def build_server_tar() -> bytes:
+def build_server_tar(prefix: str = f"{PLUGIN_NAME}/") -> bytes:
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
         for name, data in server_payload():
-            info = tarfile.TarInfo(f"{PLUGIN_NAME}/{name}")
+            info = tarfile.TarInfo(f"{prefix}{name}")
             info.size = len(data)
             info.mode = 0o644
             info.mtime = 1767225600
@@ -119,8 +120,10 @@ def main() -> int:
     dwpkg = build_dwpkg(version)
     (DIST / f"{PLUGIN_NAME}-{version}.dwpkg").write_bytes(dwpkg)
     (DIST / f"{PLUGIN_NAME}.tar.gz").write_bytes(build_server_tar())
+    (DIST / "chim-plugin.tar.gz").write_bytes(build_server_tar(prefix=""))  # CHIM Plugin Manager: files at the root
     print(f"  dist/{PLUGIN_NAME}-{version}.dwpkg")
     print(f"  dist/{PLUGIN_NAME}.tar.gz")
+    print("  dist/chim-plugin.tar.gz")
 
     if args.dll:
         if not args.dll.is_file():
